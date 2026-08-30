@@ -1,4 +1,4 @@
-﻿{
+{
   "manifest_version": 3,
   "name": "InstaPlayer Pro",
   "version": "1.0.0",
@@ -19,10 +19,13 @@
     {
       "matches": ["https://www.instagram.com/*"],
       "js": [
+        "storage.js",
         "video-finder.js",
         "controller.js",
         "hotkeys.js",
-        "overlay-ui.js"
+        "overlay-ui.js",
+        "media-session.js",
+        "mini-player.js"
       ],
       "all_frames": true,
       "run_at": "document_start"
