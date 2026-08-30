@@ -7,7 +7,8 @@ const defaultBindings = {
     'arrowdown': 'volumeDown',
     'm': 'toggleMute',
     ']': 'speedUp',
-    '[': 'speedDown'
+    '[': 'speedDown',
+    'r': 'resetSpeed'
 };
 
 function isInputFocused() {
@@ -64,5 +65,10 @@ document.addEventListener('keydown', (e) => {
             e.preventDefault();
             window.InstaController.setPlaybackRate(window.InstaController.getPlaybackRate() - 0.25);
             break;
+        case 'resetSpeed':
+            e.preventDefault();
+            window.InstaController.resetPlaybackRate();
+            break;
     }
 }, { capture: true });
+

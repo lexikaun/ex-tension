@@ -78,6 +78,7 @@ window.InstaController = {
         applyDesiredSettings();
         document.dispatchEvent(new CustomEvent('insta-player:state-updated'));
     },
+    resetPlaybackRate: () => { desiredPlaybackRate = 1.0; applyDesiredSettings(); document.dispatchEvent(new CustomEvent('insta-player:state-updated')); },
     getPlaybackRate: () => desiredPlaybackRate,
     setVolume: (vol) => {
         desiredVolume = Math.max(0, Math.min(1.0, vol));
@@ -93,3 +94,4 @@ window.InstaController = {
     },
     isMuted: () => desiredMuted
 };
+
