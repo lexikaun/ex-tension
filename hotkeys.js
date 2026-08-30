@@ -1,4 +1,4 @@
-﻿// In-page keyboard shortcuts with input-focus guarding
+// In-page keyboard shortcuts with input-focus guarding and modifiers
 const defaultBindings = {
     ' ': 'togglePlay',
     'arrowright': 'seekForward',
@@ -8,7 +8,13 @@ const defaultBindings = {
     'm': 'toggleMute',
     ']': 'speedUp',
     '[': 'speedDown',
-    'r': 'resetSpeed'
+    'r': 'resetSpeed',
+    'p': 'togglePiP'
+};
+
+const shiftBindings = {
+    'arrowright': 'stepFrameForward',
+    'arrowleft': 'stepFrameBackward'
 };
 
 function isInputFocused() {
@@ -25,12 +31,20 @@ function isInputFocused() {
 }
 
 document.addEventListener('keydown', (e) => {
+    // Guard against typing in comment boxes
     if (isInputFocused()) return;
     
     const key = e.key.toLowerCase();
-    const action = defaultBindings[key];
     
-    if (!action || !window.InstaController) return;
+    let action = null;
+    if (e.shiftKey && shiftBindings[key]) {
+        action = shiftBindings[key];
+    } else if (!e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        action = defaultBindings[key];
+    }
+    
+    if (!action) return;
+    if (!window.InstaController) return;
 
     switch (action) {
         case 'togglePlay':
@@ -44,6 +58,14 @@ document.addEventListener('keydown', (e) => {
         case 'seekBackward':
             e.preventDefault();
             window.InstaController.seekBy(-5);
+            break;
+        case 'stepFrameForward':
+            e.preventDefault();
+            window.InstaController.stepFrame(true);
+            break;
+        case 'stepFrameBackward':
+            e.preventDefault();
+            window.InstaController.stepFrame(false);
             break;
         case 'volumeUp':
             e.preventDefault();
@@ -69,6 +91,9 @@ document.addEventListener('keydown', (e) => {
             e.preventDefault();
             window.InstaController.resetPlaybackRate();
             break;
+        case 'togglePiP':
+            e.preventDefault();
+            if (window.InstaPiP) window.InstaPiP.toggle();
+            break;
     }
-}, { capture: true });
-
+}, { capture: true }); // Intercept before host site handlers
