@@ -16,15 +16,20 @@
     "https://www.instagram.com/*"
   ],
   "optional_host_permissions": [
-    "http://*/*",
-    "https://*/*"
+    "<all_urls>"
   ],
   "permissions": [
     "storage",
     "scripting"
   ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "instaplayer@lexikaun.github.io",
+      "strict_min_version": "109.0"
+    }
+  },
   "background": {
-    "service_worker": "background.js"
+    "scripts": ["background.js"]
   },
   "content_scripts": [
     {

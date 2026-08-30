@@ -6,16 +6,24 @@ const Storage = {
         muted: false
     },
     
+    _getDomainKey() {
+        return `instaplayer_settings_${window.location.hostname}`;
+    },
+    
     async init() {
         return new Promise((resolve) => {
             if (!chrome || !chrome.storage) {
                 resolve(this.settings);
                 return;
             }
-            chrome.storage.local.get(['playbackRate', 'volume', 'muted'], (result) => {
-                if (result.playbackRate !== undefined) this.settings.playbackRate = result.playbackRate;
-                if (result.volume !== undefined) this.settings.volume = result.volume;
-                if (result.muted !== undefined) this.settings.muted = result.muted;
+            const domainKey = this._getDomainKey();
+            chrome.storage.local.get([domainKey], (result) => {
+                const storedSettings = result[domainKey];
+                if (storedSettings) {
+                    if (storedSettings.playbackRate !== undefined) this.settings.playbackRate = storedSettings.playbackRate;
+                    if (storedSettings.volume !== undefined) this.settings.volume = storedSettings.volume;
+                    if (storedSettings.muted !== undefined) this.settings.muted = storedSettings.muted;
+                }
                 resolve(this.settings);
             });
         });
@@ -24,7 +32,8 @@ const Storage = {
     save(key, value) {
         this.settings[key] = value;
         if (chrome && chrome.storage) {
-            chrome.storage.local.set({ [key]: value });
+            const domainKey = this._getDomainKey();
+            chrome.storage.local.set({ [domainKey]: this.settings });
         }
     }
 };

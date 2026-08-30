@@ -92,3 +92,23 @@ if (document.documentElement) {
 } else {
     document.addEventListener('DOMContentLoaded', initObserver);
 }
+
+// Listen for popup ping
+if (chrome && chrome.runtime) {
+    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+        if (request.type === "PING_PLAYER_STATUS") {
+            // Check for unsupported players (closed shadow DOM or canvas)
+            const hasCanvasPlayer = document.querySelector('canvas') && !document.querySelector('video');
+            if (hasCanvasPlayer) {
+                sendResponse({ status: 'unsupported' });
+                return true;
+            }
+
+            sendResponse({ 
+                status: videoList.size > 0 ? 'active' : 'inactive', 
+                count: videoList.size 
+            });
+            return true;
+        }
+    });
+}

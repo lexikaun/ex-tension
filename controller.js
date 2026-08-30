@@ -119,8 +119,19 @@ window.InstaController = {
     stepFrame: (forward = true) => {
         if (!currentVideo) return;
         currentVideo.pause();
-        const fps = 30; // Reliable fallback step size
-        currentVideo.currentTime += (forward ? 1 : -1) * (1 / fps);
+        
+        const fps = 30; // Fallback step size
+        const stepAmount = (forward ? 1 : -1) * (1 / fps);
+        
+        if ('requestVideoFrameCallback' in currentVideo) {
+            currentVideo.currentTime += stepAmount;
+            currentVideo.requestVideoFrameCallback(() => {
+                // Ensure UI or other listeners update precisely when the new frame is painted
+                document.dispatchEvent(new CustomEvent('insta-player:state-updated'));
+            });
+        } else {
+            currentVideo.currentTime += stepAmount;
+        }
     },
     setPlaybackRate: (rate) => {
         desiredPlaybackRate = Math.max(0.25, Math.min(5.0, rate));
