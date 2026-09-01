@@ -28,7 +28,7 @@ function getAudioGraph(video) {
 }
 
 function getAllVideos() {
-    const vids = new Set(document.querySelectorAll('video'));
+    const vids = new Set(document.querySelectorAll('video, audio'));
     if (window.InstaVideoFinder && window.InstaVideoFinder.getAllVideos) {
         window.InstaVideoFinder.getAllVideos().forEach(v => vids.add(v));
     }
@@ -176,6 +176,7 @@ document.addEventListener('insta-player:active-video-changed', (e) => {
     if (newVideo) {
         attachListeners(newVideo);
         applyDesiredSettings();
+        document.dispatchEvent(new CustomEvent('insta-player:state-updated'));
     }
 });
 
@@ -270,3 +271,23 @@ if (chrome && chrome.runtime) {
         }
     });
 }
+
+
+
+function broadcastStateToPopup() {
+    if (chrome && chrome.runtime) {
+        const vids = getAllVideos();
+        chrome.runtime.sendMessage({
+            type: 'STATE_UPDATE',
+            status: vids.length > 0 ? 'active' : 'inactive',
+            count: vids.length,
+            currentSpeed: desiredPlaybackRate,
+            currentVolume: Math.round(desiredVolume * 100),
+            muted: desiredMuted,
+            pitchCorrection: desiredPitch,
+            maxVolume: Math.round(MAX_VOLUME * 100)
+        }).catch(() => {});
+    }
+}
+document.addEventListener('insta-player:state-updated', broadcastStateToPopup);
+

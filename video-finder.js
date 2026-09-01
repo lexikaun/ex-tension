@@ -1,4 +1,4 @@
-// Tracks all mounted videos and determines the "active" one
+﻿// Tracks all mounted videos and determines the "active" one
 const mountedVideos = new WeakSet();
 const videoList = new Set();
 let activeVideo = null;
@@ -39,7 +39,7 @@ function reevaluateActiveVideo() {
         const first = Array.from(videoList).find(v => v.isConnected);
         if (first) setActiveVideo(first);
     } else {
-        const anyVid = document.querySelector('video');
+        const anyVid = document.querySelector('video, audio');
         if (anyVid) {
             handleVideo(anyVid);
             setActiveVideo(anyVid);
@@ -77,7 +77,7 @@ const mutationObserver = new MutationObserver((mutations) => {
                 handleVideo(node);
                 hasNewVideos = true;
             } else if (node.querySelector) {
-                const vids = node.querySelectorAll('video');
+                const vids = node.querySelectorAll('video, audio');
                 if (vids.length > 0) {
                     vids.forEach(handleVideo);
                     hasNewVideos = true;
@@ -89,7 +89,7 @@ const mutationObserver = new MutationObserver((mutations) => {
 });
 
 const initObserver = () => {
-    document.querySelectorAll('video').forEach(handleVideo);
+    document.querySelectorAll('video, audio').forEach(handleVideo);
     if (document.documentElement) {
         mutationObserver.observe(document.documentElement, { childList: true, subtree: true });
     }
@@ -103,7 +103,8 @@ if (document.documentElement) {
 
 // Global API for other scripts
 window.InstaVideoFinder = {
-    getActiveVideo: () => activeVideo || document.querySelector('video'),
+    getActiveVideo: () => activeVideo || document.querySelector('video, audio'),
     getAllVideos: () => Array.from(videoList),
     reevaluate: reevaluateActiveVideo
 };
+

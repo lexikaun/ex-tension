@@ -91,6 +91,16 @@ async function executeOnAllFrames(func, args = []) {
 // Live state updates from content script hotkeys
 chrome.runtime.onMessage.addListener((msg) => {
     if (msg.type === "STATE_UPDATE") {
+        if (msg.status === 'active' || msg.count > 0) {
+            els.statusDot.className = 'status-indicator active';
+            els.statusHeading.textContent = "Player Active";
+            els.statusDesc.textContent = `Tracking ${msg.count || 1} media element(s).`;
+        } else {
+            els.statusDot.className = 'status-indicator active';
+            els.statusHeading.textContent = "Player Ready";
+            els.statusDesc.textContent = "Waiting for video/audio playback...";
+        }
+        
         if (msg.currentSpeed !== undefined && document.activeElement !== els.speedSlider) {
             els.speedSlider.value = msg.currentSpeed;
             els.speedVal.textContent = msg.currentSpeed.toFixed(2) + 'x';
@@ -340,7 +350,7 @@ async function pingAllFrames() {
     const results = await executeOnAllFrames(() => {
         if (!window.InstaController) return null;
         
-        let vids = Array.from(document.querySelectorAll('video'));
+        let vids = Array.from(document.querySelectorAll('video, audio'));
         if (window.InstaVideoFinder && window.InstaVideoFinder.getAllVideos) {
             window.InstaVideoFinder.getAllVideos().forEach(v => {
                 if (!vids.includes(v) && v.isConnected) vids.push(v);
@@ -439,7 +449,7 @@ async function init() {
     if (pingResponse && (pingResponse.status === 'active' || pingResponse.count > 0)) {
         els.statusDot.className = 'status-indicator active';
         els.statusHeading.textContent = "Player Active";
-        els.statusDesc.textContent = `Tracking ${pingResponse.count || 1} video(s).`;
+        els.statusDesc.textContent = `Tracking ${pingResponse.count || 1} media element(s).`;
         
         els.controlsPanel.classList.remove('hidden');
         
@@ -459,7 +469,7 @@ async function init() {
     } else {
         els.statusDot.className = 'status-indicator active';
         els.statusHeading.textContent = "Player Ready";
-        els.statusDesc.textContent = "Waiting for video playback...";
+        els.statusDesc.textContent = "Waiting for video/audio playback...";
         els.controlsPanel.classList.remove('hidden');
     }
 }
@@ -469,3 +479,4 @@ if (document.readyState === 'loading') {
 } else {
     init();
 }
+
