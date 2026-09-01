@@ -66,19 +66,26 @@ const els = {
     resetSettingsBtn: document.getElementById('reset-settings-btn')
 };
 
-// Safe tab message sender
-function sendTabMessage(msg, callback) {
+// Safe tab message sender with automatic tab resolution
+async function sendTabMessage(msg, callback) {
+    if (!activeTabId) {
+        try {
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (tab && tab.id) activeTabId = tab.id;
+        } catch (e) {}
+    }
     if (!activeTabId) return;
+
     try {
         chrome.tabs.sendMessage(activeTabId, msg, (response) => {
             if (chrome.runtime.lastError) {
-                // Connection error, tab might not have content script yet
+                // Benign: tab might not have loaded content scripts yet
                 return;
             }
             if (callback && response) callback(response);
         });
     } catch (e) {
-        console.warn('[Popup] Message send failed:', e);
+        console.warn('[Popup] Send message error:', e);
     }
 }
 
@@ -124,7 +131,6 @@ function renderSettings() {
     els.prefMaxVol.value = prefs.maxVolume;
     els.prefPitch.checked = prefs.pitchCorrection;
     
-    // Update max constraint on vol slider
     els.volSlider.max = prefs.maxVolume;
     
     els.keybindGrid.innerHTML = '';
@@ -150,7 +156,7 @@ function renderSettings() {
     }
 }
 
-// Rebinding logic (input-systems)
+// Rebinding logic
 let bindingAction = null;
 let bindingBtn = null;
 
@@ -248,11 +254,11 @@ els.resetSettingsBtn.addEventListener('click', () => {
 // Debounced message senders for sliders
 const sendSpeedUpdate = debounce((val) => {
     sendTabMessage({ type: "SET_SPEED", value: val });
-}, 50);
+}, 40);
 
 const sendVolUpdate = debounce((val) => {
     sendTabMessage({ type: "SET_VOLUME", value: val });
-}, 50);
+}, 40);
 
 // Playback Speed Slider
 els.speedSlider.addEventListener('input', (e) => {
@@ -283,6 +289,28 @@ els.resetSpeedBtn.addEventListener('click', () => {
     sendTabMessage({ type: "SET_SPEED", value: 1.0 });
 });
 
+// Helper to inject content scripts dynamically if not present
+async function injectContentScripts(tabId) {
+    try {
+        await chrome.scripting.executeScript({
+            target: { tabId, allFrames: true },
+            files: [
+                "storage.js",
+                "adapters/site-adapters.js",
+                "video-finder.js",
+                "controller.js",
+                "hotkeys.js",
+                "overlay-ui.js",
+                "media-session.js",
+                "mini-player.js"
+            ]
+        });
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
 // Main initialization flow
 async function init() {
     // 1. Load preferences
@@ -296,7 +324,7 @@ async function init() {
             };
         }
     } catch (e) {
-        console.warn('[Popup] Error reading storage:', e);
+        console.warn('[Popup] Storage load error:', e);
     }
     renderSettings();
 
@@ -335,6 +363,7 @@ async function init() {
             els.enableBtn.addEventListener('click', async () => {
                 const granted = await chrome.permissions.request({ origins: [origin] });
                 if (granted) {
+                    await injectContentScripts(tab.id);
                     chrome.tabs.reload(tab.id);
                     window.close();
                 }
@@ -345,8 +374,20 @@ async function init() {
         return;
     }
 
-    // 3. Ping content script for live status
-    sendTabMessage({ type: "PING_PLAYER_STATUS" }, (response) => {
+    // Origin is permitted - attempt status ping
+    sendTabMessage({ type: "PING_PLAYER_STATUS" }, async (response) => {
+        if (!response) {
+            // Content script might not be injected yet (e.g. extension just reloaded without tab refresh)
+            const injected = await injectContentScripts(tab.id);
+            if (injected) {
+                sendTabMessage({ type: "PING_PLAYER_STATUS" }, handleStatusResponse);
+                return;
+            }
+        }
+        handleStatusResponse(response);
+    });
+
+    function handleStatusResponse(response) {
         if (response && (response.status === 'active' || response.count > 0)) {
             els.statusDot.className = 'status-indicator active';
             els.statusHeading.textContent = "Player Active";
@@ -368,13 +409,17 @@ async function init() {
         } else if (response && response.status === 'unsupported') {
             setUnsupported("Unsupported Player", "A closed shadow DOM or canvas player was detected.");
         } else {
-            // Still show controls panel if permission is active so user can adjust defaults
             els.statusDot.className = 'status-indicator active';
             els.statusHeading.textContent = "Player Ready";
             els.statusDesc.textContent = "Waiting for video playback...";
             els.controlsPanel.classList.remove('hidden');
         }
-    });
+    }
 }
 
-document.addEventListener('DOMContentLoaded', init);
+// Immediate load detection
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
+}
