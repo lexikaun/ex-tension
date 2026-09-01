@@ -3,63 +3,93 @@ let currentVideo = null;
 let desiredPlaybackRate = 1.0;
 let desiredVolume = 1.0;
 let desiredMuted = false;
+let desiredPitch = true;
+let MAX_VOLUME = 4.0;
 
 // Web Audio tracking for volume boost
 const audioGraphs = new WeakMap();
-const MAX_VOLUME = 4.0; // 400% max boost
 
 function getAudioGraph(video) {
     if (audioGraphs.has(video)) return audioGraphs.get(video);
     
-    // Create lazily only when volume goes > 1.0
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const source = ctx.createMediaElementSource(video);
-    const gainNode = ctx.createGain();
-    source.connect(gainNode);
-    gainNode.connect(ctx.destination);
-    
-    const graph = { ctx, gainNode };
-    audioGraphs.set(video, graph);
-    return graph;
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const source = ctx.createMediaElementSource(video);
+        const gainNode = ctx.createGain();
+        source.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        
+        const graph = { ctx, gainNode };
+        audioGraphs.set(video, graph);
+        return graph;
+    } catch (err) {
+        console.warn('[InstaPlayer] Web Audio boost unavailable for this media element:', err);
+        return null;
+    }
+}
+
+function getActiveOrFallbackVideo() {
+    if (currentVideo && currentVideo.isConnected) return currentVideo;
+    if (window.InstaVideoFinder && window.InstaVideoFinder.getActiveVideo()) {
+        currentVideo = window.InstaVideoFinder.getActiveVideo();
+    } else {
+        currentVideo = document.querySelector('video');
+    }
+    return currentVideo;
 }
 
 function applyDesiredSettings() {
-    if (!currentVideo) return;
+    const video = getActiveOrFallbackVideo();
+    if (!video) return;
     
-    if (currentVideo.playbackRate !== desiredPlaybackRate) {
-        currentVideo.playbackRate = desiredPlaybackRate;
+    if (video.playbackRate !== desiredPlaybackRate) {
+        video.playbackRate = desiredPlaybackRate;
     }
     
-    if (currentVideo.muted !== desiredMuted) {
-        currentVideo.muted = desiredMuted;
+    if (video.preservesPitch !== desiredPitch) {
+        video.preservesPitch = desiredPitch;
+        if (video.mozPreservesPitch !== undefined) video.mozPreservesPitch = desiredPitch;
+        if (video.webkitPreservesPitch !== undefined) video.webkitPreservesPitch = desiredPitch;
+    }
+    
+    if (video.muted !== desiredMuted) {
+        video.muted = desiredMuted;
     }
 
     if (desiredVolume <= 1.0) {
-        if (currentVideo.volume !== desiredVolume) currentVideo.volume = desiredVolume;
-        if (audioGraphs.has(currentVideo)) {
-            audioGraphs.get(currentVideo).gainNode.gain.value = 1.0;
+        if (video.volume !== desiredVolume) video.volume = desiredVolume;
+        if (audioGraphs.has(video)) {
+            const graph = audioGraphs.get(video);
+            if (graph && graph.gainNode) graph.gainNode.gain.value = 1.0;
         }
     } else {
-        currentVideo.volume = 1.0; // Max out native volume
-        const graph = getAudioGraph(currentVideo);
-        graph.gainNode.gain.value = desiredVolume;
+        video.volume = 1.0;
+        const graph = getAudioGraph(video);
+        if (graph && graph.gainNode) {
+            graph.gainNode.gain.value = desiredVolume;
+            if (graph.ctx.state === 'suspended') {
+                graph.ctx.resume().catch(() => {});
+            }
+        }
     }
 }
 
 function onRateChange() {
-    if (currentVideo && currentVideo.playbackRate !== desiredPlaybackRate) {
-        currentVideo.playbackRate = desiredPlaybackRate;
+    const video = getActiveOrFallbackVideo();
+    if (video && video.playbackRate !== desiredPlaybackRate) {
+        video.playbackRate = desiredPlaybackRate;
     }
 }
 
 function onVolumeChange() {
-    if (!currentVideo) return;
+    const video = getActiveOrFallbackVideo();
+    if (!video) return;
     if (desiredVolume <= 1.0) {
-        if (currentVideo.volume !== desiredVolume) currentVideo.volume = desiredVolume;
+        if (video.volume !== desiredVolume) video.volume = desiredVolume;
     } else {
-        if (currentVideo.volume !== 1.0) currentVideo.volume = 1.0;
+        if (video.volume !== 1.0) video.volume = 1.0;
     }
-    if (currentVideo.muted !== desiredMuted) currentVideo.muted = desiredMuted;
+    if (video.muted !== desiredMuted) video.muted = desiredMuted;
 }
 
 function onLoadedMetadata() {
@@ -67,25 +97,59 @@ function onLoadedMetadata() {
 }
 
 function attachListeners(video) {
+    if (!video) return;
     video.addEventListener('ratechange', onRateChange);
     video.addEventListener('volumechange', onVolumeChange);
     video.addEventListener('loadedmetadata', onLoadedMetadata);
 }
 
 function detachListeners(video) {
+    if (!video) return;
     video.removeEventListener('ratechange', onRateChange);
     video.removeEventListener('volumechange', onVolumeChange);
     video.removeEventListener('loadedmetadata', onLoadedMetadata);
 }
 
-// Load settings on init
+// Load global settings from storage.js persistence
+function reloadSettingsFromPrefs(prefs) {
+    if (!prefs) return;
+    if (prefs.maxVolume !== undefined) {
+        MAX_VOLUME = (prefs.maxVolume || 400) / 100;
+    }
+    if (prefs.pitchCorrection !== undefined) {
+        desiredPitch = prefs.pitchCorrection !== false;
+    }
+    if (prefs.defaultSpeed !== undefined && !sessionStorage.getItem('instaplayer_manual_speed')) {
+        desiredPlaybackRate = prefs.defaultSpeed;
+    }
+    if (prefs.defaultVolume !== undefined && !sessionStorage.getItem('instaplayer_manual_vol')) {
+        desiredVolume = Math.min((prefs.defaultVolume || 100) / 100, MAX_VOLUME);
+    }
+    desiredVolume = Math.min(desiredVolume, MAX_VOLUME);
+    applyDesiredSettings();
+}
+
+// Initial video pickup
+const initialVid = getActiveOrFallbackVideo();
+if (initialVid) {
+    attachListeners(initialVid);
+    applyDesiredSettings();
+}
+
 if (window.InstaStorage) {
     window.InstaStorage.init().then(settings => {
-        desiredPlaybackRate = settings.playbackRate;
-        desiredVolume = settings.volume;
-        desiredMuted = settings.muted;
-        applyDesiredSettings();
-        document.dispatchEvent(new CustomEvent('insta-player:state-updated'));
+        if (settings.playbackRate !== undefined) desiredPlaybackRate = settings.playbackRate;
+        if (settings.volume !== undefined) desiredVolume = settings.volume;
+        if (settings.muted !== undefined) desiredMuted = settings.muted;
+        
+        // Fetch full prefs for maxVolume, defaults and pitch
+        if (chrome && chrome.storage && chrome.storage.local) {
+            chrome.storage.local.get(['prefs'], (res) => {
+                if (res.prefs) reloadSettingsFromPrefs(res.prefs);
+                applyDesiredSettings();
+                document.dispatchEvent(new CustomEvent('insta-player:state-updated'));
+            });
+        }
     });
 }
 
@@ -106,34 +170,33 @@ document.addEventListener('insta-player:active-video-changed', (e) => {
 });
 
 window.InstaController = {
-    getCurrentVideo: () => currentVideo,
-    play: () => currentVideo?.play(),
-    pause: () => currentVideo?.pause(),
+    getCurrentVideo: () => getActiveOrFallbackVideo(),
+    play: () => {
+        const v = getActiveOrFallbackVideo();
+        return v?.play();
+    },
+    pause: () => {
+        const v = getActiveOrFallbackVideo();
+        return v?.pause();
+    },
     togglePlay: () => {
-        if (!currentVideo) return;
-        currentVideo.paused ? currentVideo.play() : currentVideo.pause();
+        const v = getActiveOrFallbackVideo();
+        if (!v) return;
+        v.paused ? v.play() : v.pause();
     },
     seekBy: (seconds) => {
-        if (currentVideo) currentVideo.currentTime += seconds;
+        const v = getActiveOrFallbackVideo();
+        if (v) v.currentTime += seconds;
     },
     stepFrame: (forward = true) => {
-        if (!currentVideo) return;
-        currentVideo.pause();
-        
-        const fps = 30; // Fallback step size
-        const stepAmount = (forward ? 1 : -1) * (1 / fps);
-        
-        if ('requestVideoFrameCallback' in currentVideo) {
-            currentVideo.currentTime += stepAmount;
-            currentVideo.requestVideoFrameCallback(() => {
-                // Ensure UI or other listeners update precisely when the new frame is painted
-                document.dispatchEvent(new CustomEvent('insta-player:state-updated'));
-            });
-        } else {
-            currentVideo.currentTime += stepAmount;
-        }
+        const v = getActiveOrFallbackVideo();
+        if (!v) return;
+        v.pause();
+        const fps = 30;
+        v.currentTime += (forward ? 1 : -1) * (1 / fps);
     },
     setPlaybackRate: (rate) => {
+        sessionStorage.setItem('instaplayer_manual_speed', '1');
         desiredPlaybackRate = Math.max(0.25, Math.min(5.0, rate));
         applyDesiredSettings();
         document.dispatchEvent(new CustomEvent('insta-player:state-updated'));
@@ -145,13 +208,16 @@ window.InstaController = {
     },
     getPlaybackRate: () => desiredPlaybackRate,
     setVolume: (vol) => {
+        sessionStorage.setItem('instaplayer_manual_vol', '1');
         desiredVolume = Math.max(0, Math.min(MAX_VOLUME, vol));
         if (desiredVolume > 0) desiredMuted = false;
         
-        // Ensure AudioContext is resumed upon user interaction
-        if (desiredVolume > 1.0 && currentVideo) {
-            const ctx = getAudioGraph(currentVideo).ctx;
-            if (ctx.state === 'suspended') ctx.resume();
+        const v = getActiveOrFallbackVideo();
+        if (desiredVolume > 1.0 && v) {
+            const graph = getAudioGraph(v);
+            if (graph && graph.ctx && graph.ctx.state === 'suspended') {
+                graph.ctx.resume().catch(() => {});
+            }
         }
         
         applyDesiredSettings();
@@ -165,3 +231,46 @@ window.InstaController = {
     },
     isMuted: () => desiredMuted
 };
+
+// Message listener for popup UI controls & ping requests
+if (chrome && chrome.runtime) {
+    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+        if (request.type === "SET_SPEED") {
+            window.InstaController.setPlaybackRate(request.value);
+            sendResponse({ success: true, currentSpeed: desiredPlaybackRate });
+            return true;
+        } else if (request.type === "SET_VOLUME") {
+            window.InstaController.setVolume(request.value / 100);
+            sendResponse({ success: true, currentVolume: Math.round(desiredVolume * 100) });
+            return true;
+        } else if (request.type === "SET_PITCH") {
+            desiredPitch = Boolean(request.value);
+            applyDesiredSettings();
+            sendResponse({ success: true, pitchCorrection: desiredPitch });
+            return true;
+        } else if (request.type === "RELOAD_PREFS") {
+            reloadSettingsFromPrefs(request.prefs);
+            sendResponse({ success: true });
+            return true;
+        } else if (request.type === "PING_PLAYER_STATUS") {
+            const vid = getActiveOrFallbackVideo();
+            const hasCanvasPlayer = document.querySelector('canvas') && !document.querySelector('video');
+            if (hasCanvasPlayer) {
+                sendResponse({ status: 'unsupported' });
+                return true;
+            }
+
+            const allVids = document.querySelectorAll('video');
+            sendResponse({
+                status: (vid || allVids.length > 0) ? 'active' : 'inactive',
+                count: allVids.length,
+                currentSpeed: desiredPlaybackRate,
+                currentVolume: Math.round(desiredVolume * 100),
+                muted: desiredMuted,
+                pitchCorrection: desiredPitch,
+                maxVolume: Math.round(MAX_VOLUME * 100)
+            });
+            return true;
+        }
+    });
+}

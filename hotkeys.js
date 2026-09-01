@@ -1,21 +1,37 @@
-// In-page keyboard shortcuts with input-focus guarding and modifiers
-const defaultBindings = {
-    ' ': 'togglePlay',
-    'arrowright': 'seekForward',
-    'arrowleft': 'seekBackward',
-    'arrowup': 'volumeUp',
-    'arrowdown': 'volumeDown',
-    'm': 'toggleMute',
-    ']': 'speedUp',
-    '[': 'speedDown',
-    'r': 'resetSpeed',
-    'p': 'togglePiP'
+// In-page keyboard shortcuts with input-focus guarding and dynamic configuration
+const DEFAULT_KEYBINDS = {
+    'togglePlay': ' ',
+    'seekForward': 'arrowright',
+    'seekBackward': 'arrowleft',
+    'stepFrameForward': 'shift+arrowright',
+    'stepFrameBackward': 'shift+arrowleft',
+    'volumeUp': 'arrowup',
+    'volumeDown': 'arrowdown',
+    'toggleMute': 'm',
+    'speedUp': ']',
+    'speedDown': '[',
+    'resetSpeed': 'r',
+    'togglePiP': 'p'
 };
 
-const shiftBindings = {
-    'arrowright': 'stepFrameForward',
-    'arrowleft': 'stepFrameBackward'
-};
+let activeKeybinds = { ...DEFAULT_KEYBINDS };
+
+// Load initially from storage
+if (chrome && chrome.storage) {
+    chrome.storage.local.get(['prefs'], (res) => {
+        if (res.prefs && res.prefs.keybinds) {
+            activeKeybinds = { ...DEFAULT_KEYBINDS, ...res.prefs.keybinds };
+        }
+    });
+
+    chrome.storage.onChanged.addListener((changes, area) => {
+        if (area === 'local' && changes.prefs && changes.prefs.newValue) {
+            if (changes.prefs.newValue.keybinds) {
+                activeKeybinds = { ...DEFAULT_KEYBINDS, ...changes.prefs.newValue.keybinds };
+            }
+        }
+    });
+}
 
 function isInputFocused() {
     const active = document.activeElement;
@@ -30,17 +46,31 @@ function isInputFocused() {
     return isTextInput || isTextArea || isContentEditable;
 }
 
+function getHotkeyString(e) {
+    let parts = [];
+    if (e.ctrlKey) parts.push('ctrl');
+    if (e.altKey) parts.push('alt');
+    if (e.shiftKey) parts.push('shift');
+    if (e.metaKey) parts.push('meta');
+    if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return null;
+    parts.push(e.key.toLowerCase());
+    return parts.join('+');
+}
+
 document.addEventListener('keydown', (e) => {
     // Guard against typing in comment boxes
     if (isInputFocused()) return;
     
-    const key = e.key.toLowerCase();
+    const hotkeyStr = getHotkeyString(e);
+    if (!hotkeyStr) return;
     
+    // Reverse lookup: Find which action matches this hotkey string
     let action = null;
-    if (e.shiftKey && shiftBindings[key]) {
-        action = shiftBindings[key];
-    } else if (!e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
-        action = defaultBindings[key];
+    for (const [act, key] of Object.entries(activeKeybinds)) {
+        if (key === hotkeyStr) {
+            action = act;
+            break;
+        }
     }
     
     if (!action) return;

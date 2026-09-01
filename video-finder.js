@@ -32,10 +32,18 @@ function reevaluateActiveVideo() {
         }
     }
 
-    if (bestVideo && (!bestVideo.paused || bestVideo.readyState >= 3)) {
+    if (bestVideo) {
         setActiveVideo(bestVideo);
-    } else if (bestVideo) {
-        setActiveVideo(bestVideo);
+    } else if (videoList.size > 0) {
+        // Fallback to first available attached video
+        const first = Array.from(videoList).find(v => v.isConnected);
+        if (first) setActiveVideo(first);
+    } else {
+        const anyVid = document.querySelector('video');
+        if (anyVid) {
+            handleVideo(anyVid);
+            setActiveVideo(anyVid);
+        }
     }
 }
 
@@ -93,22 +101,9 @@ if (document.documentElement) {
     document.addEventListener('DOMContentLoaded', initObserver);
 }
 
-// Listen for popup ping
-if (chrome && chrome.runtime) {
-    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-        if (request.type === "PING_PLAYER_STATUS") {
-            // Check for unsupported players (closed shadow DOM or canvas)
-            const hasCanvasPlayer = document.querySelector('canvas') && !document.querySelector('video');
-            if (hasCanvasPlayer) {
-                sendResponse({ status: 'unsupported' });
-                return true;
-            }
-
-            sendResponse({ 
-                status: videoList.size > 0 ? 'active' : 'inactive', 
-                count: videoList.size 
-            });
-            return true;
-        }
-    });
-}
+// Global API for other scripts
+window.InstaVideoFinder = {
+    getActiveVideo: () => activeVideo || document.querySelector('video'),
+    getAllVideos: () => Array.from(videoList),
+    reevaluate: reevaluateActiveVideo
+};
