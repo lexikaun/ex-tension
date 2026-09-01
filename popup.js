@@ -44,12 +44,7 @@ const els = {
     navSettings: document.getElementById('nav-settings'),
     navMain: document.getElementById('nav-main'),
     
-    statusDot: document.getElementById('status-dot'),
-    statusHeading: document.getElementById('status-heading'),
-    statusDesc: document.getElementById('status-desc'),
-    actionPanel: document.getElementById('action-panel'),
     controlsPanel: document.getElementById('controls-panel'),
-    enableBtn: document.getElementById('enable-btn'),
     
     speedSlider: document.getElementById('speed-slider'),
     speedVal: document.getElementById('speed-val'),
@@ -91,16 +86,6 @@ async function executeOnAllFrames(func, args = []) {
 // Live state updates from content script hotkeys
 chrome.runtime.onMessage.addListener((msg) => {
     if (msg.type === "STATE_UPDATE") {
-        if (msg.status === 'active' || msg.count > 0) {
-            els.statusDot.className = 'status-indicator active';
-            els.statusHeading.textContent = "Player Active";
-            els.statusDesc.textContent = `Tracking ${msg.count || 1} media element(s).`;
-        } else {
-            els.statusDot.className = 'status-indicator active';
-            els.statusHeading.textContent = "Player Ready";
-            els.statusDesc.textContent = "Waiting for video/audio playback...";
-        }
-        
         if (msg.currentSpeed !== undefined && document.activeElement !== els.speedSlider) {
             els.speedSlider.value = msg.currentSpeed;
             els.speedVal.textContent = msg.currentSpeed.toFixed(2) + 'x';
@@ -134,12 +119,6 @@ els.navMain.addEventListener('click', () => {
     els.mainView.classList.remove('hidden');
     els.settingsView.classList.add('hidden');
 });
-
-function setUnsupported(title, desc) {
-    els.statusDot.className = 'status-indicator error';
-    els.statusHeading.textContent = title;
-    els.statusDesc.textContent = desc;
-}
 
 function formatHotkeyDisplay(str) {
     if (str === ' ') return 'Space';
@@ -394,16 +373,19 @@ async function init() {
     } catch (e) {}
     renderSettings();
 
+    // Set UI to defaults immediately (stateless)
+    els.speedSlider.value = prefs.defaultSpeed;
+    els.speedVal.textContent = prefs.defaultSpeed.toFixed(2) + 'x';
+    els.volSlider.value = prefs.defaultVolume;
+    els.volVal.textContent = prefs.defaultVolume + '%';
+    els.volSlider.max = prefs.maxVolume;
+
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab || !tab.id) {
-        setUnsupported("System Page", "Extensions cannot run on this page.");
-        return;
-    }
+    if (!tab || !tab.id) return;
     activeTabId = tab.id;
 
     if (tab.url && (tab.url.startsWith('chrome://') || tab.url.startsWith('edge://') || tab.url.startsWith('brave://') || tab.url.startsWith('about:'))) {
-        setUnsupported("System Page", "Extensions cannot run on this browser page.");
-        return;
+        return; // UI stays rendered, but sending commands will just fail silently
     }
 
     let pingResponse = await pingAllFrames();
@@ -411,20 +393,10 @@ async function init() {
         const injected = await injectContentScripts(tab.id);
         if (injected) {
             pingResponse = await pingAllFrames();
-        } else {
-            // Injection failed (likely a restricted page like chrome web store)
-            setUnsupported("Restricted Page", "Extensions cannot run on this page.");
-            return;
         }
     }
 
-    if (pingResponse && (pingResponse.status === 'active' || pingResponse.count > 0)) {
-        els.statusDot.className = 'status-indicator active';
-        els.statusHeading.textContent = "Player Active";
-        els.statusDesc.textContent = `Tracking ${pingResponse.count || 1} media element(s).`;
-        
-        els.controlsPanel.classList.remove('hidden');
-        
+    if (pingResponse) {
         if (pingResponse.currentSpeed !== undefined) {
             els.speedSlider.value = pingResponse.currentSpeed;
             els.speedVal.textContent = pingResponse.currentSpeed.toFixed(2) + 'x';
@@ -436,13 +408,6 @@ async function init() {
         if (pingResponse.maxVolume !== undefined) {
             els.volSlider.max = pingResponse.maxVolume;
         }
-    } else if (pingResponse && pingResponse.status === 'unsupported') {
-        setUnsupported("Unsupported Player", "A closed shadow DOM or canvas player was detected.");
-    } else {
-        els.statusDot.className = 'status-indicator active';
-        els.statusHeading.textContent = "Player Ready";
-        els.statusDesc.textContent = "Waiting for video/audio playback...";
-        els.controlsPanel.classList.remove('hidden');
     }
 }
 
