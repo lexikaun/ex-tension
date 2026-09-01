@@ -227,7 +227,13 @@ window.InstaController = {
         applyDesiredSettings();
         document.dispatchEvent(new CustomEvent('insta-player:state-updated'));
     },
-    isMuted: () => desiredMuted
+    isMuted: () => desiredMuted,
+    setPitch: (pitch) => {
+        desiredPitch = Boolean(pitch);
+        applyDesiredSettings();
+        document.dispatchEvent(new CustomEvent('insta-player:state-updated'));
+    },
+    getMaxVolume: () => MAX_VOLUME
 };
 
 // Message listener for popup UI controls & ping requests
