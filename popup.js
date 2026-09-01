@@ -411,7 +411,7 @@ async function init() {
         if (hasMedia) {
             els.statusDot.className = 'status-indicator';
             els.statusHeading.textContent = "Media Detected";
-            els.statusDesc.textContent = "InstaPlayer requires permission to activate.";
+            els.statusDesc.textContent = "Ex-Tension requires permission to activate.";
             els.actionPanel.classList.remove('hidden');
             
             els.enableBtn.addEventListener('click', async () => {
