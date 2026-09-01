@@ -62,8 +62,8 @@ document.addEventListener('mousemove', (e) => {
     const dx = e.clientX - startX;
     const dy = e.clientY - startY;
     uiHost.style.right = 'auto'; // Disable right anchoring
-    uiHost.style.left = \`\${initialLeft + dx}px\`;
-    uiHost.style.top = \`\${initialTop + dy}px\`;
+    uiHost.style.left = `${initialLeft + dx}px`;
+    uiHost.style.top = `${initialTop + dy}px`;
 });
 
 document.addEventListener('mouseup', () => {
@@ -86,8 +86,8 @@ function updateUI() {
     const vol = Math.round(window.InstaController.getVolume() * 100);
     const muted = window.InstaController.isMuted();
     
-    shadow.querySelector('#speed-val').textContent = \`\${speed}x\`;
-    shadow.querySelector('#vol-val').textContent = muted ? 'MUTED' : \`\${vol}%\`;
+    shadow.querySelector('#speed-val').textContent = `${speed}x`;
+    shadow.querySelector('#vol-val').textContent = muted ? 'MUTED' : `${vol}%`;
 }
 
 document.addEventListener('insta-player:state-updated', updateUI);
