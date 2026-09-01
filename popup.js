@@ -395,46 +395,14 @@ async function init() {
     renderSettings();
 
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab || !tab.url || tab.url.startsWith('chrome://')) {
+    if (!tab || !tab.id) {
         setUnsupported("System Page", "Extensions cannot run on this page.");
         return;
     }
     activeTabId = tab.id;
 
-    const url = new URL(tab.url);
-    const origin = url.origin + "/*";
-    const hasPermission = await chrome.permissions.contains({ origins: [origin] });
-
-    if (!hasPermission) {
-        let hasMedia = false;
-        try {
-            const results = await chrome.scripting.executeScript({
-                target: { tabId: tab.id, allFrames: true },
-                func: () => document.querySelectorAll('video, audio').length > 0
-            });
-            hasMedia = results && results.some(r => r.result === true);
-        } catch (e) {
-            setUnsupported("Probe Failed", "Cannot access this page.");
-            return;
-        }
-
-        if (hasMedia) {
-            els.statusDot.className = 'status-indicator';
-            els.statusHeading.textContent = "Media Detected";
-            els.statusDesc.textContent = "Ex-Tension requires permission to activate.";
-            els.actionPanel.classList.remove('hidden');
-            
-            els.enableBtn.addEventListener('click', async () => {
-                const granted = await chrome.permissions.request({ origins: [origin] });
-                if (granted) {
-                    await injectContentScripts(tab.id);
-                    chrome.tabs.reload(tab.id);
-                    window.close();
-                }
-            });
-        } else {
-            setUnsupported("No Media Found", "No HTML5 video or audio elements detected on this page.");
-        }
+    if (tab.url && (tab.url.startsWith('chrome://') || tab.url.startsWith('edge://') || tab.url.startsWith('brave://') || tab.url.startsWith('about:'))) {
+        setUnsupported("System Page", "Extensions cannot run on this browser page.");
         return;
     }
 
@@ -443,6 +411,10 @@ async function init() {
         const injected = await injectContentScripts(tab.id);
         if (injected) {
             pingResponse = await pingAllFrames();
+        } else {
+            // Injection failed (likely a restricted page like chrome web store)
+            setUnsupported("Restricted Page", "Extensions cannot run on this page.");
+            return;
         }
     }
 
