@@ -11,7 +11,8 @@ const DEFAULT_KEYBINDS = {
     'speedUp': ']',
     'speedDown': '[',
     'resetSpeed': 'r',
-    'togglePiP': 'p'
+    'togglePiP': 'p',
+    'toggleHUD': 'v'
 };
 
 let activeKeybinds = { ...DEFAULT_KEYBINDS };
@@ -124,6 +125,10 @@ document.addEventListener('keydown', (e) => {
         case 'togglePiP':
             e.preventDefault();
             if (window.InstaPiP) window.InstaPiP.toggle();
+            break;
+        case 'toggleHUD':
+            e.preventDefault();
+            if (window.InstaOverlay) window.InstaOverlay.toggle();
             break;
     }
 }, { capture: true }); // Intercept before host site handlers

@@ -79,6 +79,8 @@ if (document.body) {
     });
 }
 
+let isHudVisible = false;
+
 // Sync UI with controller state
 function updateUI() {
     if (!window.InstaController) return;
@@ -86,21 +88,52 @@ function updateUI() {
     const vol = Math.round(window.InstaController.getVolume() * 100);
     const muted = window.InstaController.isMuted();
     
-    shadow.querySelector('#speed-val').textContent = `${speed}x`;
-    shadow.querySelector('#vol-val').textContent = muted ? 'MUTED' : `${vol}%`;
+    const speedEl = shadow.querySelector('#speed-val');
+    const volEl = shadow.querySelector('#vol-val');
+    if (speedEl) speedEl.textContent = `${speed}x`;
+    if (volEl) volEl.textContent = muted ? 'MUTED' : `${vol}%`;
 }
 
-document.addEventListener('insta-player:state-updated', updateUI);
+document.addEventListener('insta-player:state-updated', () => {
+    if (isHudVisible) updateUI();
+});
 
-// Show/hide based on active video
+// Show/hide based on active video and visibility state
 document.addEventListener('insta-player:active-video-changed', (e) => {
     if (e.detail.video) {
-        uiHost.style.display = 'block';
-        updateUI(); // Initial paint
+        if (isHudVisible) {
+            uiHost.style.display = 'block';
+            updateUI(); // Initial paint
+        }
     } else {
         uiHost.style.display = 'none';
     }
 });
+
+// Toggle HUD API
+function toggleHUD() {
+    isHudVisible = !isHudVisible;
+    if (isHudVisible) {
+        uiHost.style.display = 'block';
+        updateUI();
+    } else {
+        uiHost.style.display = 'none';
+    }
+}
+
+window.InstaOverlay = {
+    toggle: toggleHUD,
+    show: () => {
+        isHudVisible = true;
+        uiHost.style.display = 'block';
+        updateUI();
+    },
+    hide: () => {
+        isHudVisible = false;
+        uiHost.style.display = 'none';
+    },
+    isVisible: () => isHudVisible
+};
 
 // Handle fullscreen reparenting
 document.addEventListener('fullscreenchange', () => {

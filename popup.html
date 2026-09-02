@@ -15,7 +15,20 @@
                 </button>
             </header>
             
-            <div id="controls-panel" class="panel">
+            <div id="status-panel" class="panel">
+                <div class="status-indicator" id="status-dot"></div>
+                <div class="status-text">
+                    <h2 id="status-heading">Checking site...</h2>
+                    <p id="status-desc">Probing for media...</p>
+                </div>
+            </div>
+
+            <div id="action-panel" class="panel hidden">
+                <button id="enable-btn" class="primary-btn">Enable on this site</button>
+                <p class="micro-copy">Requires permission to automatically manage video on this domain.</p>
+            </div>
+
+            <div id="controls-panel" class="panel hidden">
                 <div class="control-group">
                     <div class="control-header">
                         <label>Playback Speed</label>

@@ -15,7 +15,8 @@ const DEFAULT_PREFS = {
         'speedUp': ']',
         'speedDown': '[',
         'resetSpeed': 'r',
-        'togglePiP': 'p'
+        'togglePiP': 'p',
+        'toggleHUD': 'v'
     }
 };
 
@@ -31,7 +32,8 @@ const ACTION_LABELS = {
     'speedUp': 'Speed Up',
     'speedDown': 'Speed Down',
     'resetSpeed': 'Reset Speed',
-    'togglePiP': 'Mini Player (PiP)'
+    'togglePiP': 'Mini Player (PiP)',
+    'toggleHUD': 'Toggle On-Screen HUD'
 };
 
 const CONTENT_SCRIPTS = [
