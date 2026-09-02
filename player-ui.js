@@ -56,7 +56,7 @@ if (window.location.hostname.includes('instagram.com')) {
         button {
             background: none;
             border: none;
-            padding: 0;
+            padding: 4px;
             margin: 0;
             cursor: pointer;
             color: var(--primary);
@@ -90,7 +90,7 @@ if (window.location.hostname.includes('instagram.com')) {
         .scrubber-wrapper {
             position: relative;
             width: 100%;
-            height: 12px;
+            height: 20px;
             display: flex;
             align-items: center;
             cursor: pointer;
@@ -100,7 +100,7 @@ if (window.location.hostname.includes('instagram.com')) {
             position: absolute;
             left: 0;
             width: 100%;
-            height: 3px;
+            height: 4px;
             background: rgba(255, 255, 255, 0.3);
             border-radius: 2px;
             transition: height 0.1s;
@@ -109,7 +109,7 @@ if (window.location.hostname.includes('instagram.com')) {
         .scrubber-progress {
             position: absolute;
             left: 0;
-            height: 3px;
+            height: 4px;
             background: var(--primary);
             border-radius: 2px;
             width: 0%;
@@ -118,8 +118,8 @@ if (window.location.hostname.includes('instagram.com')) {
 
         .scrubber-thumb {
             position: absolute;
-            width: 12px;
-            height: 12px;
+            width: 14px;
+            height: 14px;
             background: var(--primary);
             border-radius: 50%;
             left: 0%;
@@ -130,7 +130,7 @@ if (window.location.hostname.includes('instagram.com')) {
 
         .scrubber-wrapper:hover .scrubber-track,
         .scrubber-wrapper:hover .scrubber-progress {
-            height: 5px;
+            height: 6px;
         }
 
         .scrubber-wrapper:hover .scrubber-thumb {
@@ -319,18 +319,12 @@ if (window.location.hostname.includes('instagram.com')) {
             return;
         }
 
-        // Try to find a good container. Usually Instagram videos are in a wrapper div.
-        let targetContainer = video.parentNode;
-        
-        // Ensure container has relative/absolute positioning so playerHost absolute anchors properly
-        const style = window.getComputedStyle(targetContainer);
-        if (style.position === 'static') {
-            targetContainer.style.position = 'relative';
+        // Always attach to body to avoid clipping and stacking context issues
+        if (playerHost.parentNode !== document.body) {
+            document.body.appendChild(playerHost);
         }
-
-        if (playerHost.parentNode !== targetContainer) {
-            targetContainer.appendChild(playerHost);
-        }
+        playerHost.style.position = 'fixed';
+        playerHost.style.zIndex = '2147483647'; // Max z-index
 
         video.addEventListener('timeupdate', updateUI);
         video.addEventListener('play', () => { updateUI(); showControls(); });
@@ -339,8 +333,17 @@ if (window.location.hostname.includes('instagram.com')) {
         video.addEventListener('loadedmetadata', updateUI);
         
         // Show controls on mouse move over the video container
+        const targetContainer = video.closest('article') || video.parentNode;
         targetContainer.addEventListener('mousemove', showControls);
         targetContainer.addEventListener('mouseleave', () => {
+            if (!currentVideo?.paused && !isDragging) {
+                container.classList.remove('visible');
+            }
+        });
+        
+        // Ensure player host captures mouse movements to stay visible
+        playerHost.addEventListener('mousemove', showControls);
+        playerHost.addEventListener('mouseleave', () => {
             if (!currentVideo?.paused && !isDragging) {
                 container.classList.remove('visible');
             }
@@ -349,6 +352,27 @@ if (window.location.hostname.includes('instagram.com')) {
         updateUI();
         showControls();
     }
+
+    // Sync position of the control bar to the video
+    function syncPosition() {
+        if (currentVideo && currentVideo.isConnected && container.classList.contains('visible')) {
+            const rect = currentVideo.getBoundingClientRect();
+            // Only show if video is somewhat visible
+            if (rect.width > 50 && rect.height > 50 && rect.bottom > 0 && rect.top < window.innerHeight) {
+                playerHost.style.left = `${rect.left}px`;
+                playerHost.style.width = `${rect.width}px`;
+                
+                // Position at the bottom of the video
+                playerHost.style.top = `${rect.bottom - container.offsetHeight}px`;
+                playerHost.style.bottom = 'auto';
+                playerHost.style.display = 'block';
+            } else {
+                playerHost.style.display = 'none';
+            }
+        }
+        requestAnimationFrame(syncPosition);
+    }
+    requestAnimationFrame(syncPosition);
 
     document.addEventListener('insta-player:active-video-changed', (e) => {
         attachToVideo(e.detail.video);
