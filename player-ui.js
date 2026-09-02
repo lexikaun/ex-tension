@@ -17,28 +17,36 @@ if (window.location.hostname.includes('instagram.com')) {
         :host {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             --primary: #ffffff;
-            --bg: linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%);
+            --bg: rgba(15, 15, 15, 0.65);
+            --bg-hover: rgba(25, 25, 25, 0.8);
             --accent: #E0E0E0;
         }
 
         .player-container {
             position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
+            bottom: 40px; /* Float above native captions */
+            left: 5%;
+            width: 90%;
             background: var(--bg);
-            padding: 10px 15px 5px 15px;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 12px 16px;
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 10px;
             opacity: 0;
-            transition: opacity 0.2s ease;
+            transform: translateY(10px);
+            transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             pointer-events: auto;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
         }
 
         .player-container.visible, .player-container:hover {
             opacity: 1;
+            transform: translateY(0);
         }
 
         .controls-row {
@@ -63,37 +71,40 @@ if (window.location.hostname.includes('instagram.com')) {
             display: flex;
             align-items: center;
             justify-content: center;
-            opacity: 0.85;
-            transition: opacity 0.1s;
+            opacity: 0.7;
+            transition: opacity 0.2s, transform 0.1s;
         }
         
         button:hover {
             opacity: 1;
+            transform: scale(1.1);
         }
 
         svg {
-            width: 24px;
-            height: 24px;
+            width: 22px;
+            height: 22px;
             fill: currentColor;
-            filter: drop-shadow(0px 1px 2px rgba(0,0,0,0.5));
+            filter: drop-shadow(0px 1px 2px rgba(0,0,0,0.3));
         }
 
         .time-display {
             color: var(--primary);
             font-size: 13px;
             font-variant-numeric: tabular-nums;
-            text-shadow: 0px 1px 2px rgba(0,0,0,0.5);
             font-weight: 500;
+            opacity: 0.9;
+            letter-spacing: 0.3px;
         }
 
         /* Scrubber */
         .scrubber-wrapper {
             position: relative;
             width: 100%;
-            height: 20px;
+            height: 16px;
             display: flex;
             align-items: center;
             cursor: pointer;
+            border-radius: 8px;
         }
 
         .scrubber-track {
@@ -101,9 +112,9 @@ if (window.location.hostname.includes('instagram.com')) {
             left: 0;
             width: 100%;
             height: 4px;
-            background: rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.25);
             border-radius: 2px;
-            transition: height 0.1s;
+            transition: height 0.2s;
         }
 
         .scrubber-progress {
@@ -113,19 +124,20 @@ if (window.location.hostname.includes('instagram.com')) {
             background: var(--primary);
             border-radius: 2px;
             width: 0%;
-            transition: height 0.1s;
+            transition: height 0.2s;
         }
 
         .scrubber-thumb {
             position: absolute;
-            width: 14px;
-            height: 14px;
+            width: 12px;
+            height: 12px;
             background: var(--primary);
             border-radius: 50%;
             left: 0%;
             transform: translateX(-50%) scale(0);
-            transition: transform 0.1s;
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             pointer-events: none;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.4);
         }
 
         .scrubber-wrapper:hover .scrubber-track,
@@ -134,7 +146,61 @@ if (window.location.hostname.includes('instagram.com')) {
         }
 
         .scrubber-wrapper:hover .scrubber-thumb {
-            transform: translateX(-50%) scale(1);
+            transform: translateX(-50%) scale(1.2);
+        }
+
+        /* Volume Slider Popup */
+        .volume-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .volume-popup {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%) translateY(10px);
+            background: var(--bg-hover);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 12px 0;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+        }
+
+        .volume-container:hover .volume-popup {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(-12px);
+        }
+
+        .volume-slider {
+            -webkit-appearance: slider-vertical;
+            appearance: slider-vertical;
+            width: 6px;
+            height: 80px;
+            cursor: pointer;
+            background: rgba(255,255,255,0.2);
+            border-radius: 3px;
+            outline: none;
+        }
+        
+        .volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            background: #fff;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.5);
         }
     `;
 
@@ -163,7 +229,12 @@ if (window.location.hostname.includes('instagram.com')) {
         <div class="controls-row">
             <div class="controls-left">
                 <button class="btn-play-pause">${makeSvg(icons.play)}</button>
-                <button class="btn-mute">${makeSvg(icons.unmute)}</button>
+                <div class="volume-container">
+                    <button class="btn-mute">${makeSvg(icons.unmute)}</button>
+                    <div class="volume-popup">
+                        <input type="range" class="volume-slider" min="0" max="1" step="0.01" value="1" orient="vertical">
+                    </div>
+                </div>
                 <div class="time-display">0:00 / 0:00</div>
             </div>
             <div class="controls-right">
@@ -185,9 +256,11 @@ if (window.location.hostname.includes('instagram.com')) {
     const scrubberWrapper = container.querySelector('.scrubber-wrapper');
     const scrubberProgress = container.querySelector('.scrubber-progress');
     const scrubberThumb = container.querySelector('.scrubber-thumb');
+    const volumeSlider = container.querySelector('.volume-slider');
 
     let currentVideo = null;
     let isDragging = false;
+    let isDraggingVolume = false;
     let visibilityTimeout = null;
 
     // Helpers
@@ -204,8 +277,12 @@ if (window.location.hostname.includes('instagram.com')) {
         // Play/Pause
         btnPlayPause.innerHTML = makeSvg(currentVideo.paused ? icons.play : icons.pause);
         
-        // Mute
-        btnMute.innerHTML = makeSvg(currentVideo.muted || currentVideo.volume === 0 ? icons.mute : icons.unmute);
+        // Mute & Volume
+        const isMuted = currentVideo.muted || currentVideo.volume === 0;
+        btnMute.innerHTML = makeSvg(isMuted ? icons.mute : icons.unmute);
+        if (!isDraggingVolume) {
+            volumeSlider.value = isMuted ? 0 : currentVideo.volume;
+        }
         
         // Time & Scrubber (only if not dragging)
         if (!isDragging) {
@@ -225,7 +302,7 @@ if (window.location.hostname.includes('instagram.com')) {
         container.classList.add('visible');
         clearTimeout(visibilityTimeout);
         visibilityTimeout = setTimeout(() => {
-            if (!currentVideo?.paused && !isDragging) {
+            if (!currentVideo?.paused && !isDragging && !isDraggingVolume) {
                 container.classList.remove('visible');
             }
         }, 2500);
@@ -242,6 +319,18 @@ if (window.location.hostname.includes('instagram.com')) {
         e.stopPropagation();
         if (!currentVideo) return;
         currentVideo.muted = !currentVideo.muted;
+        if (!currentVideo.muted && currentVideo.volume === 0) {
+            currentVideo.volume = 1;
+        }
+    });
+
+    volumeSlider.addEventListener('mousedown', () => isDraggingVolume = true);
+    volumeSlider.addEventListener('mouseup', () => isDraggingVolume = false);
+    volumeSlider.addEventListener('input', (e) => {
+        if (!currentVideo) return;
+        const val = parseFloat(e.target.value);
+        currentVideo.volume = val;
+        currentVideo.muted = val === 0;
     });
 
     btnPip.addEventListener('click', (e) => {
@@ -336,7 +425,7 @@ if (window.location.hostname.includes('instagram.com')) {
         const targetContainer = video.closest('article') || video.parentNode;
         targetContainer.addEventListener('mousemove', showControls);
         targetContainer.addEventListener('mouseleave', () => {
-            if (!currentVideo?.paused && !isDragging) {
+            if (!currentVideo?.paused && !isDragging && !isDraggingVolume) {
                 container.classList.remove('visible');
             }
         });
@@ -344,7 +433,7 @@ if (window.location.hostname.includes('instagram.com')) {
         // Ensure player host captures mouse movements to stay visible
         playerHost.addEventListener('mousemove', showControls);
         playerHost.addEventListener('mouseleave', () => {
-            if (!currentVideo?.paused && !isDragging) {
+            if (!currentVideo?.paused && !isDragging && !isDraggingVolume) {
                 container.classList.remove('visible');
             }
         });
@@ -362,8 +451,8 @@ if (window.location.hostname.includes('instagram.com')) {
                 playerHost.style.left = `${rect.left}px`;
                 playerHost.style.width = `${rect.width}px`;
                 
-                // Position at the bottom of the video
-                playerHost.style.top = `${rect.bottom - container.offsetHeight}px`;
+                // Anchor playerHost exactly at the bottom of the video
+                playerHost.style.top = `${rect.bottom}px`;
                 playerHost.style.bottom = 'auto';
                 playerHost.style.display = 'block';
             } else {
