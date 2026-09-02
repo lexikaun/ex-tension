@@ -12,39 +12,19 @@ function setActiveVideo(video) {
 }
 
 function reevaluateActiveVideo() {
-    // 1. Highest Priority: Any video currently playing
-    const playingVideos = Array.from(videoList).filter(v => v.isConnected && !v.paused);
-    if (playingVideos.length > 0) {
-        let bestPlaying = playingVideos[0];
-        let maxPlayingVis = -1;
-        for (const v of playingVideos) {
-            const r = v.getBoundingClientRect();
-            const vis = Math.max(0, Math.min(r.right, window.innerWidth) - Math.max(r.left, 0)) *
-                        Math.max(0, Math.min(r.bottom, window.innerHeight) - Math.max(r.top, 0));
-            if (vis > maxPlayingVis) {
-                maxPlayingVis = vis;
-                bestPlaying = v;
-            }
-        }
-        setActiveVideo(bestPlaying);
+    if (window.location.pathname.startsWith('/direct')) {
+        setActiveVideo(null);
         return;
     }
 
-    // 2. If activeVideo is still connected and decently visible, keep it instead of fluttering
-    if (activeVideo && activeVideo.isConnected) {
-        const r = activeVideo.getBoundingClientRect();
-        const visHeight = Math.max(0, Math.min(r.bottom, window.innerHeight) - Math.max(r.top, 0));
-        if (visHeight > 150) {
-            return;
-        }
-    }
+    let playingVideo = null;
+    let maxPlayingVisibility = 0;
 
-    // 3. Fallback: video with maximum visibility in viewport
     let bestVideo = null;
     let maxVisibility = 0;
 
     for (const video of videoList) {
-        if (!video.isConnected) {
+        if (!video.isConnected || video.nodeName !== 'VIDEO') {
             videoList.delete(video);
             continue;
         }
@@ -54,15 +34,29 @@ function reevaluateActiveVideo() {
         const visibleHeight = Math.max(0, Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0));
         const visibilityScore = visibleWidth * visibleHeight;
 
+        // Skip if not meaningfully visible
+        if (visibilityScore < 2000 || rect.width < 50 || rect.height < 50) {
+            continue;
+        }
+
+        // Check if actively playing
+        const isPlaying = !video.paused && !video.ended && video.readyState > 1;
+        if (isPlaying) {
+            if (visibilityScore > maxPlayingVisibility) {
+                maxPlayingVisibility = visibilityScore;
+                playingVideo = video;
+            }
+        }
+
         if (visibilityScore > maxVisibility) {
             maxVisibility = visibilityScore;
             bestVideo = video;
         }
     }
 
-    if (bestVideo && maxVisibility > 1000) {
-        setActiveVideo(bestVideo);
-    }
+    // Always prefer the video currently playing
+    const selected = playingVideo || bestVideo || null;
+    setActiveVideo(selected);
 }
 
 const intersectionObserver = new IntersectionObserver((entries) => {
@@ -71,10 +65,10 @@ const intersectionObserver = new IntersectionObserver((entries) => {
         if (entry.isIntersecting) needsReevaluation = true;
     });
     if (needsReevaluation) reevaluateActiveVideo();
-}, { threshold: [0, 0.5, 1] });
+}, { threshold: [0, 0.25, 0.5, 0.75, 1] });
 
 function handleVideo(video) {
-    if (mountedVideos.has(video)) return;
+    if (!video || video.nodeName !== 'VIDEO' || mountedVideos.has(video)) return;
     mountedVideos.add(video);
     videoList.add(video);
     
@@ -82,9 +76,8 @@ function handleVideo(video) {
     
     video.addEventListener('play', () => setActiveVideo(video));
     video.addEventListener('playing', () => setActiveVideo(video));
-    video.addEventListener('pause', () => {
-        setTimeout(reevaluateActiveVideo, 50);
-    });
+    video.addEventListener('pause', () => reevaluateActiveVideo());
+    video.addEventListener('ended', () => reevaluateActiveVideo());
     
     reevaluateActiveVideo();
 }
@@ -98,7 +91,7 @@ const mutationObserver = new MutationObserver((mutations) => {
                 handleVideo(node);
                 hasNewVideos = true;
             } else if (node.querySelector) {
-                const vids = node.querySelectorAll('video, audio');
+                const vids = node.querySelectorAll('video');
                 if (vids.length > 0) {
                     vids.forEach(handleVideo);
                     hasNewVideos = true;
@@ -110,7 +103,7 @@ const mutationObserver = new MutationObserver((mutations) => {
 });
 
 const initObserver = () => {
-    document.querySelectorAll('video, audio').forEach(handleVideo);
+    document.querySelectorAll('video').forEach(handleVideo);
     if (document.documentElement) {
         mutationObserver.observe(document.documentElement, { childList: true, subtree: true });
     }
@@ -122,10 +115,17 @@ if (document.documentElement) {
     document.addEventListener('DOMContentLoaded', initObserver);
 }
 
+// Re-evaluate on scroll & navigation
+window.addEventListener('scroll', () => {
+    reevaluateActiveVideo();
+}, { passive: true });
+
+window.addEventListener('popstate', reevaluateActiveVideo);
+
 // Global API for other scripts
 window.InstaVideoFinder = {
-    getActiveVideo: () => activeVideo || document.querySelector('video, audio'),
-    getAllVideos: () => Array.from(videoList),
+    getActiveVideo: () => activeVideo,
+    getAllVideos: () => Array.from(videoList).filter(v => v.isConnected && v.nodeName === 'VIDEO'),
     reevaluate: reevaluateActiveVideo
 };
 

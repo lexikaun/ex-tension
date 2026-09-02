@@ -422,19 +422,34 @@ if (window.location.hostname.includes('instagram.com')) {
         }
     }
 
+    let currentTargetContainer = null;
+    function onTargetMouseMove() { showControls(); }
+    function onTargetMouseLeave() {
+        if (!currentVideo?.paused && !isDragging && !isDraggingVolume) {
+            container.classList.remove('visible');
+        }
+    }
+
     // Attach to active video
     function attachToVideo(video) {
         if (currentVideo) {
             currentVideo.removeEventListener('timeupdate', updateUI);
-            currentVideo.removeEventListener('play', updateUI);
-            currentVideo.removeEventListener('pause', updateUI);
+            currentVideo.removeEventListener('play', showControls);
+            currentVideo.removeEventListener('pause', showControls);
             currentVideo.removeEventListener('volumechange', updateUI);
             currentVideo.removeEventListener('loadedmetadata', updateUI);
         }
 
+        if (currentTargetContainer) {
+            currentTargetContainer.removeEventListener('mousemove', onTargetMouseMove);
+            currentTargetContainer.removeEventListener('mouseleave', onTargetMouseLeave);
+            currentTargetContainer = null;
+        }
+
         currentVideo = video;
-        if (!video) {
-            if (playerHost.parentNode) playerHost.parentNode.removeChild(playerHost);
+        if (!video || !video.isConnected || window.location.pathname.startsWith('/direct')) {
+            playerHost.style.display = 'none';
+            container.classList.remove('visible');
             return;
         }
 
@@ -452,21 +467,15 @@ if (window.location.hostname.includes('instagram.com')) {
         video.addEventListener('loadedmetadata', updateUI);
         
         // Show controls on mouse move over the video container
-        const targetContainer = video.closest('article') || video.parentNode;
-        targetContainer.addEventListener('mousemove', showControls);
-        targetContainer.addEventListener('mouseleave', () => {
-            if (!currentVideo?.paused && !isDragging && !isDraggingVolume) {
-                container.classList.remove('visible');
-            }
-        });
+        currentTargetContainer = video.closest('article') || video.parentNode;
+        if (currentTargetContainer) {
+            currentTargetContainer.addEventListener('mousemove', onTargetMouseMove);
+            currentTargetContainer.addEventListener('mouseleave', onTargetMouseLeave);
+        }
         
         // Ensure player host captures mouse movements to stay visible
         playerHost.addEventListener('mousemove', showControls);
-        playerHost.addEventListener('mouseleave', () => {
-            if (!currentVideo?.paused && !isDragging && !isDraggingVolume) {
-                container.classList.remove('visible');
-            }
-        });
+        playerHost.addEventListener('mouseleave', onTargetMouseLeave);
 
         updateUI();
         showControls();
@@ -485,66 +494,67 @@ if (window.location.hostname.includes('instagram.com')) {
         }
     });
 
-    // Helper to find the video currently playing on page
-    function getCurrentlyPlayingVideo() {
-        const all = Array.from(document.querySelectorAll('video'));
-        return all.find(v => !v.paused && v.isConnected && v.readyState > 0);
-    }
-
     // Sync position of the control bar to the video
     function syncPosition() {
-        // Priority 1: If another video is playing, immediately lock onto it
-        const playingVid = getCurrentlyPlayingVideo();
-        if (playingVid && playingVid !== currentVideo) {
-            attachToVideo(playingVid);
-        }
-
-        if (currentVideo && currentVideo.isConnected && container.classList.contains('visible')) {
-            const rect = currentVideo.getBoundingClientRect();
-            
-            // Check visibility in viewport
-            const visibleHeight = Math.max(0, Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0));
-            const visibleWidth = Math.max(0, Math.min(rect.right, window.innerWidth) - Math.max(rect.left, 0));
-            const isVisible = rect.width > 50 && rect.height > 50 && visibleHeight > 100 && visibleWidth > 100;
-
-            // Stop HUD from appearing at the top while scrolling:
-            // Hide if the video has scrolled mostly off-screen or its bottom is in the top header area
-            const isScrolledAway = rect.bottom < 150 || rect.top > window.innerHeight - 60;
-
-            if (document.fullscreenElement) {
-                playerHost.style.left = '0px';
-                playerHost.style.width = '100%';
-                playerHost.style.top = 'auto';
-                playerHost.style.bottom = '0px';
-                playerHost.style.display = 'block';
-            } else if (isVisible && !isScrolledAway) {
-                playerHost.style.left = `${rect.left}px`;
-                playerHost.style.width = `${rect.width}px`;
-
-                // If this is a full-height Reel / Story or occupies most of viewport height:
-                // ALWAYS pin the HUD directly to the bottom of the screen (bottom: 0px)
-                const isFullHeight = rect.height >= window.innerHeight * 0.75 ||
-                                     window.location.pathname.includes('/reel') ||
-                                     window.location.pathname.includes('/stories');
-
-                if (isFullHeight) {
-                    playerHost.style.top = 'auto';
-                    playerHost.style.bottom = '0px';
-                } else {
-                    // For standard feed posts: anchor to video bottom, clamped to screen bottom
-                    const clampedY = Math.min(rect.bottom, window.innerHeight);
-                    playerHost.style.top = `${clampedY}px`;
-                    playerHost.style.bottom = 'auto';
-                }
-
-                playerHost.style.display = 'block';
-            } else {
-                playerHost.style.display = 'none';
-            }
-        } else if (!currentVideo || !currentVideo.isConnected) {
+        // Hide immediately if no video, disconnected, or on Direct Messages
+        if (!currentVideo || !currentVideo.isConnected || window.location.pathname.startsWith('/direct')) {
             playerHost.style.display = 'none';
+            requestAnimationFrame(syncPosition);
+            return;
         }
 
+        // If another video became active / started playing, switch to it
+        if (window.InstaVideoFinder) {
+            const active = window.InstaVideoFinder.getActiveVideo();
+            if (active && active !== currentVideo && !active.paused) {
+                attachToVideo(active);
+                requestAnimationFrame(syncPosition);
+                return;
+            }
+        }
+
+        const rect = currentVideo.getBoundingClientRect();
+        const winH = window.innerHeight;
+        const winW = window.innerWidth;
+
+        // Video must be visibly on screen
+        const isVisible = (
+            rect.width > 50 &&
+            rect.height > 50 &&
+            rect.bottom > 80 && // at least 80px above video bottom is visible
+            rect.top < winH - 60 && // video hasn't scrolled completely below screen
+            rect.right > 0 &&
+            rect.left < winW
+        );
+
+        if (!isVisible && !document.fullscreenElement) {
+            playerHost.style.display = 'none';
+            requestAnimationFrame(syncPosition);
+            return;
+        }
+
+        if (!container.classList.contains('visible')) {
+            playerHost.style.display = 'none';
+            requestAnimationFrame(syncPosition);
+            return;
+        }
+
+        if (!document.fullscreenElement) {
+            playerHost.style.left = `${rect.left}px`;
+            playerHost.style.width = `${rect.width}px`;
+
+            // Pin strictly to the bottom of the video, clamped to viewport bottom
+            const clampedBottom = Math.min(rect.bottom, winH);
+            playerHost.style.top = `${clampedBottom}px`;
+            playerHost.style.bottom = 'auto';
+        } else {
+            playerHost.style.left = '0px';
+            playerHost.style.width = '100%';
+            playerHost.style.top = 'auto';
+            playerHost.style.bottom = '0px';
+        }
+
+        playerHost.style.display = 'block';
         requestAnimationFrame(syncPosition);
     }
     requestAnimationFrame(syncPosition);
@@ -556,6 +566,16 @@ if (window.location.hostname.includes('instagram.com')) {
     document.addEventListener('insta-player:state-updated', () => {
         updateUI();
     });
+
+    // Handle SPA navigation (e.g. going to Messages /direct)
+    const onLocationChange = () => {
+        if (window.location.pathname.startsWith('/direct')) {
+            attachToVideo(null);
+        } else if (window.InstaVideoFinder) {
+            window.InstaVideoFinder.reevaluate();
+        }
+    };
+    window.addEventListener('popstate', onLocationChange);
 
     // Initial check
     if (window.InstaVideoFinder) {
