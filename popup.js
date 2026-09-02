@@ -563,31 +563,35 @@ async function init() {
     }
 
     // 3. Render appropriate UI state
-    if (pingResponse && (pingResponse.status === 'active' || pingResponse.count > 0)) {
-        els.statusDot.className = 'status-indicator active';
-        els.statusHeading.textContent = "Player Active";
-        els.statusDesc.textContent = `Tracking ${pingResponse.count || 1} media element(s).`;
-        
+    if (pingResponse) {
+        if (pingResponse.status === 'unsupported') {
+            setUnsupported("Unsupported Player", "A closed shadow DOM or canvas player was detected.");
+            return;
+        }
+
+        if (pingResponse.status === 'active' || pingResponse.count > 0) {
+            els.statusDot.className = 'status-indicator active';
+            els.statusHeading.textContent = "Player Active";
+            els.statusDesc.textContent = `Tracking ${pingResponse.count || 1} media element(s).`;
+        } else {
+            els.statusDot.className = 'status-indicator active';
+            els.statusHeading.textContent = "Player Ready";
+            els.statusDesc.textContent = "Waiting for video/audio playback...";
+        }
+
         els.controlsPanel.classList.remove('hidden');
-        
-        if (pingResponse.currentSpeed !== undefined) {
+
+        if (pingResponse.currentSpeed !== undefined && pingResponse.currentSpeed !== null) {
             els.speedSlider.value = pingResponse.currentSpeed;
             els.speedVal.textContent = Number(pingResponse.currentSpeed).toFixed(2) + 'x';
         }
-        if (pingResponse.currentVolume !== undefined) {
+        if (pingResponse.currentVolume !== undefined && pingResponse.currentVolume !== null) {
             els.volSlider.value = pingResponse.currentVolume;
             els.volVal.textContent = pingResponse.currentVolume + '%';
         }
-        if (pingResponse.maxVolume !== undefined) {
+        if (pingResponse.maxVolume !== undefined && pingResponse.maxVolume !== null) {
             els.volSlider.max = pingResponse.maxVolume;
         }
-    } else if (pingResponse && pingResponse.status === 'unsupported') {
-        setUnsupported("Unsupported Player", "A closed shadow DOM or canvas player was detected.");
-    } else if (pingResponse) {
-        els.statusDot.className = 'status-indicator active';
-        els.statusHeading.textContent = "Player Ready";
-        els.statusDesc.textContent = "Waiting for video/audio playback...";
-        els.controlsPanel.classList.remove('hidden');
     } else {
         // Injection failed completely (e.g. Chrome Web Store or other browser-protected pages)
         setUnsupported("Restricted Page", "Extensions cannot run on this page.");

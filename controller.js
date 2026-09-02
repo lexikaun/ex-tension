@@ -264,12 +264,28 @@ if (chrome && chrome.runtime) {
                 return true;
             }
 
+            const activeVid = getActiveVideo();
+            let liveSpeed = desiredPlaybackRate;
+            let liveVol = Math.round(desiredVolume * 100);
+            let liveMuted = desiredMuted;
+
+            if (activeVid) {
+                if (activeVid.playbackRate && Math.abs(activeVid.playbackRate - desiredPlaybackRate) > 0.01) {
+                    desiredPlaybackRate = activeVid.playbackRate;
+                }
+                liveSpeed = desiredPlaybackRate;
+                if (desiredVolume <= 1.0 && activeVid.volume !== undefined) {
+                    liveVol = Math.round(desiredVolume * 100);
+                }
+                liveMuted = activeVid.muted !== undefined ? activeVid.muted : desiredMuted;
+            }
+
             sendResponse({
                 status: vids.length > 0 ? 'active' : 'inactive',
                 count: vids.length,
-                currentSpeed: desiredPlaybackRate,
-                currentVolume: Math.round(desiredVolume * 100),
-                muted: desiredMuted,
+                currentSpeed: liveSpeed,
+                currentVolume: liveVol,
+                muted: liveMuted,
                 pitchCorrection: desiredPitch,
                 maxVolume: Math.round(MAX_VOLUME * 100)
             });
@@ -283,13 +299,23 @@ if (chrome && chrome.runtime) {
 function broadcastStateToPopup() {
     if (chrome && chrome.runtime) {
         const vids = getAllVideos();
+        const activeVid = getActiveVideo();
+        let liveSpeed = desiredPlaybackRate;
+        let liveVol = Math.round(desiredVolume * 100);
+        let liveMuted = desiredMuted;
+
+        if (activeVid) {
+            liveSpeed = activeVid.playbackRate || desiredPlaybackRate;
+            liveMuted = activeVid.muted !== undefined ? activeVid.muted : desiredMuted;
+        }
+
         chrome.runtime.sendMessage({
             type: 'STATE_UPDATE',
             status: vids.length > 0 ? 'active' : 'inactive',
             count: vids.length,
-            currentSpeed: desiredPlaybackRate,
-            currentVolume: Math.round(desiredVolume * 100),
-            muted: desiredMuted,
+            currentSpeed: liveSpeed,
+            currentVolume: liveVol,
+            muted: liveMuted,
             pitchCorrection: desiredPitch,
             maxVolume: Math.round(MAX_VOLUME * 100)
         }).catch(() => {});
