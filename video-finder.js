@@ -1,4 +1,4 @@
-﻿// Tracks all mounted videos and determines the "active" one
+// Tracks all mounted videos and determines the "active" one
 const mountedVideos = new WeakSet();
 const videoList = new Set();
 let activeVideo = null;
@@ -12,6 +12,34 @@ function setActiveVideo(video) {
 }
 
 function reevaluateActiveVideo() {
+    // 1. Highest Priority: Any video currently playing
+    const playingVideos = Array.from(videoList).filter(v => v.isConnected && !v.paused);
+    if (playingVideos.length > 0) {
+        let bestPlaying = playingVideos[0];
+        let maxPlayingVis = -1;
+        for (const v of playingVideos) {
+            const r = v.getBoundingClientRect();
+            const vis = Math.max(0, Math.min(r.right, window.innerWidth) - Math.max(r.left, 0)) *
+                        Math.max(0, Math.min(r.bottom, window.innerHeight) - Math.max(r.top, 0));
+            if (vis > maxPlayingVis) {
+                maxPlayingVis = vis;
+                bestPlaying = v;
+            }
+        }
+        setActiveVideo(bestPlaying);
+        return;
+    }
+
+    // 2. If activeVideo is still connected and decently visible, keep it instead of fluttering
+    if (activeVideo && activeVideo.isConnected) {
+        const r = activeVideo.getBoundingClientRect();
+        const visHeight = Math.max(0, Math.min(r.bottom, window.innerHeight) - Math.max(r.top, 0));
+        if (visHeight > 150) {
+            return;
+        }
+    }
+
+    // 3. Fallback: video with maximum visibility in viewport
     let bestVideo = null;
     let maxVisibility = 0;
 
@@ -32,18 +60,8 @@ function reevaluateActiveVideo() {
         }
     }
 
-    if (bestVideo) {
+    if (bestVideo && maxVisibility > 1000) {
         setActiveVideo(bestVideo);
-    } else if (videoList.size > 0) {
-        // Fallback to first available attached video
-        const first = Array.from(videoList).find(v => v.isConnected);
-        if (first) setActiveVideo(first);
-    } else {
-        const anyVid = document.querySelector('video, audio');
-        if (anyVid) {
-            handleVideo(anyVid);
-            setActiveVideo(anyVid);
-        }
     }
 }
 
@@ -64,6 +82,9 @@ function handleVideo(video) {
     
     video.addEventListener('play', () => setActiveVideo(video));
     video.addEventListener('playing', () => setActiveVideo(video));
+    video.addEventListener('pause', () => {
+        setTimeout(reevaluateActiveVideo, 50);
+    });
     
     reevaluateActiveVideo();
 }

@@ -485,31 +485,66 @@ if (window.location.hostname.includes('instagram.com')) {
         }
     });
 
+    // Helper to find the video currently playing on page
+    function getCurrentlyPlayingVideo() {
+        const all = Array.from(document.querySelectorAll('video'));
+        return all.find(v => !v.paused && v.isConnected && v.readyState > 0);
+    }
+
     // Sync position of the control bar to the video
     function syncPosition() {
+        // Priority 1: If another video is playing, immediately lock onto it
+        const playingVid = getCurrentlyPlayingVideo();
+        if (playingVid && playingVid !== currentVideo) {
+            attachToVideo(playingVid);
+        }
+
         if (currentVideo && currentVideo.isConnected && container.classList.contains('visible')) {
             const rect = currentVideo.getBoundingClientRect();
-            // Only show if video is somewhat visible
-            if (rect.width > 50 && rect.height > 50 && (rect.bottom > 0 || document.fullscreenElement)) {
-                
-                if (!document.fullscreenElement) {
-                    playerHost.style.left = `${rect.left}px`;
-                    playerHost.style.width = `${rect.width}px`;
-                    // Anchor playerHost exactly at the bottom of the video
-                    playerHost.style.top = `${rect.bottom}px`;
-                    playerHost.style.bottom = 'auto';
-                } else {
-                    playerHost.style.left = '0px';
-                    playerHost.style.width = '100%';
+            
+            // Check visibility in viewport
+            const visibleHeight = Math.max(0, Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0));
+            const visibleWidth = Math.max(0, Math.min(rect.right, window.innerWidth) - Math.max(rect.left, 0));
+            const isVisible = rect.width > 50 && rect.height > 50 && visibleHeight > 100 && visibleWidth > 100;
+
+            // Stop HUD from appearing at the top while scrolling:
+            // Hide if the video has scrolled mostly off-screen or its bottom is in the top header area
+            const isScrolledAway = rect.bottom < 150 || rect.top > window.innerHeight - 60;
+
+            if (document.fullscreenElement) {
+                playerHost.style.left = '0px';
+                playerHost.style.width = '100%';
+                playerHost.style.top = 'auto';
+                playerHost.style.bottom = '0px';
+                playerHost.style.display = 'block';
+            } else if (isVisible && !isScrolledAway) {
+                playerHost.style.left = `${rect.left}px`;
+                playerHost.style.width = `${rect.width}px`;
+
+                // If this is a full-height Reel / Story or occupies most of viewport height:
+                // ALWAYS pin the HUD directly to the bottom of the screen (bottom: 0px)
+                const isFullHeight = rect.height >= window.innerHeight * 0.75 ||
+                                     window.location.pathname.includes('/reel') ||
+                                     window.location.pathname.includes('/stories');
+
+                if (isFullHeight) {
                     playerHost.style.top = 'auto';
                     playerHost.style.bottom = '0px';
+                } else {
+                    // For standard feed posts: anchor to video bottom, clamped to screen bottom
+                    const clampedY = Math.min(rect.bottom, window.innerHeight);
+                    playerHost.style.top = `${clampedY}px`;
+                    playerHost.style.bottom = 'auto';
                 }
-                
+
                 playerHost.style.display = 'block';
             } else {
                 playerHost.style.display = 'none';
             }
+        } else if (!currentVideo || !currentVideo.isConnected) {
+            playerHost.style.display = 'none';
         }
+
         requestAnimationFrame(syncPosition);
     }
     requestAnimationFrame(syncPosition);
