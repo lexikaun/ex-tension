@@ -1,6 +1,19 @@
 // Only run on Instagram as per user requirement
 if (window.location.hostname.includes('instagram.com')) {
 
+    // Fix native Instagram fullscreen cropping issues globally
+    if (!document.getElementById('insta-player-global-css')) {
+        const globalStyle = document.createElement('style');
+        globalStyle.id = 'insta-player-global-css';
+        globalStyle.textContent = `
+            :fullscreen video {
+                object-fit: contain !important;
+                background: black !important;
+            }
+        `;
+        document.head.appendChild(globalStyle);
+    }
+
     const playerHost = document.createElement('div');
     playerHost.id = 'insta-custom-player-host';
     playerHost.style.position = 'absolute';
@@ -161,46 +174,49 @@ if (window.location.hostname.includes('instagram.com')) {
             bottom: 100%;
             left: 50%;
             transform: translateX(-50%) translateY(8px);
-            background: var(--bg-hover);
+            background: var(--bg);
             backdrop-filter: blur(8px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
             border-radius: 8px;
-            padding: 8px 0;
+            padding: 0;
             opacity: 0;
             visibility: hidden;
             transition: all 0.2s ease;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 80px;
+            width: 24px;
+            height: 90px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.3);
         }
 
         .volume-container:hover .volume-popup {
             opacity: 1;
             visibility: visible;
-            transform: translateX(-50%) translateY(-6px);
+            transform: translateX(-50%) translateY(-4px);
         }
 
         .volume-slider {
-            -webkit-appearance: slider-vertical;
-            appearance: slider-vertical;
-            width: 4px;
-            height: 64px;
+            -webkit-appearance: none;
+            appearance: none;
+            width: 70px;
+            height: 4px;
             cursor: pointer;
-            background: rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.3);
             border-radius: 2px;
             outline: none;
+            transform: rotate(-90deg);
         }
         
         .volume-slider::-webkit-slider-thumb {
             -webkit-appearance: none;
-            width: 10px;
-            height: 10px;
+            width: 12px;
+            height: 12px;
             background: #fff;
             border-radius: 50%;
             cursor: pointer;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.5);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.6);
         }
     `;
 
@@ -232,7 +248,7 @@ if (window.location.hostname.includes('instagram.com')) {
                 <div class="volume-container">
                     <button class="btn-mute">${makeSvg(icons.unmute)}</button>
                     <div class="volume-popup">
-                        <input type="range" class="volume-slider" min="0" max="1" step="0.01" value="1" orient="vertical">
+                        <input type="range" class="volume-slider" min="0" max="1" step="0.01" value="1">
                     </div>
                 </div>
                 <div class="time-display">0:00 / 0:00</div>
@@ -341,7 +357,7 @@ if (window.location.hostname.includes('instagram.com')) {
     btnFullscreen.addEventListener('click', (e) => {
         e.stopPropagation();
         if (!currentVideo) return;
-        const parent = currentVideo.closest('article') || currentVideo.parentNode;
+        const parent = currentVideo.parentNode;
         if (document.fullscreenElement) {
             document.exitFullscreen();
             btnFullscreen.innerHTML = makeSvg(icons.fullscreen);
@@ -369,6 +385,7 @@ if (window.location.hostname.includes('instagram.com')) {
     }
 
     scrubberWrapper.addEventListener('mousedown', (e) => {
+        e.preventDefault(); // Prevents native text/element drag which breaks mouseup capture
         isDragging = true;
         handleScrub(e);
         document.addEventListener('mousemove', onMouseMove);
@@ -442,18 +459,39 @@ if (window.location.hostname.includes('instagram.com')) {
         showControls();
     }
 
+    document.addEventListener('fullscreenchange', () => {
+        if (document.fullscreenElement) {
+            // Move into the fullscreen element so it stays visible
+            document.fullscreenElement.appendChild(playerHost);
+            // Re-anchor to the bottom of the window in fullscreen
+            playerHost.style.top = 'auto';
+            playerHost.style.bottom = '0px';
+        } else {
+            // Restore to body
+            document.body.appendChild(playerHost);
+        }
+    });
+
     // Sync position of the control bar to the video
     function syncPosition() {
         if (currentVideo && currentVideo.isConnected && container.classList.contains('visible')) {
             const rect = currentVideo.getBoundingClientRect();
             // Only show if video is somewhat visible
-            if (rect.width > 50 && rect.height > 50 && rect.bottom > 0 && rect.top < window.innerHeight) {
-                playerHost.style.left = `${rect.left}px`;
-                playerHost.style.width = `${rect.width}px`;
+            if (rect.width > 50 && rect.height > 50 && (rect.bottom > 0 || document.fullscreenElement)) {
                 
-                // Anchor playerHost exactly at the bottom of the video
-                playerHost.style.top = `${rect.bottom}px`;
-                playerHost.style.bottom = 'auto';
+                if (!document.fullscreenElement) {
+                    playerHost.style.left = `${rect.left}px`;
+                    playerHost.style.width = `${rect.width}px`;
+                    // Anchor playerHost exactly at the bottom of the video
+                    playerHost.style.top = `${rect.bottom}px`;
+                    playerHost.style.bottom = 'auto';
+                } else {
+                    playerHost.style.left = '0px';
+                    playerHost.style.width = '100%';
+                    playerHost.style.top = 'auto';
+                    playerHost.style.bottom = '0px';
+                }
+                
                 playerHost.style.display = 'block';
             } else {
                 playerHost.style.display = 'none';
