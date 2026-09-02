@@ -107,16 +107,22 @@ function onRateChange(e) {
 function onVolumeChange(e) {
     const video = e.target;
     if (!video) return;
-    const active = getActiveVideo();
-    if (video === active) {
-        desiredMuted = video.muted;
-        if (video.volume > 0 && desiredVolume <= 1.0) {
-            desiredVolume = video.volume;
-        }
+    // Enforce user's desired mute and volume settings against Instagram auto-mute resets
+    if (video.muted !== desiredMuted) {
+        video.muted = desiredMuted;
+    }
+    if (desiredVolume <= 1.0) {
+        if (video.volume !== desiredVolume) video.volume = desiredVolume;
+    } else {
+        if (video.volume !== 1.0) video.volume = 1.0;
     }
 }
 
 function onLoadedMetadata(e) {
+    applyDesiredSettings();
+}
+
+function onPlayOrPlaying(e) {
     applyDesiredSettings();
 }
 
@@ -126,6 +132,8 @@ function attachListeners(video) {
     video.addEventListener('ratechange', onRateChange);
     video.addEventListener('volumechange', onVolumeChange);
     video.addEventListener('loadedmetadata', onLoadedMetadata);
+    video.addEventListener('play', onPlayOrPlaying);
+    video.addEventListener('playing', onPlayOrPlaying);
 }
 
 // Attach listeners to all present and future videos
@@ -227,15 +235,10 @@ window.InstaController = {
     },
     getVolume: () => desiredVolume,
     toggleMute: () => {
-        const v = getActiveVideo();
-        const isCurrentlyMuted = v && typeof v.muted === 'boolean' ? v.muted : desiredMuted;
-        desiredMuted = !isCurrentlyMuted;
+        desiredMuted = !desiredMuted;
         if (!desiredMuted) {
             if (desiredVolume === 0) {
                 desiredVolume = 1.0;
-            }
-            if (v && v.volume === 0) {
-                v.volume = 1.0;
             }
         }
         applyDesiredSettings();
