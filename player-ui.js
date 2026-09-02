@@ -1,8 +1,8 @@
 // Only run on Instagram as per user requirement
 if (window.location.hostname.includes('instagram.com')) {
 
-    // Fix native Instagram fullscreen cropping issues globally
-    if (!document.getElementById('insta-player-global-css')) {
+    function injectGlobalCss() {
+        if (!document.head || document.getElementById('insta-player-global-css')) return;
         const globalStyle = document.createElement('style');
         globalStyle.id = 'insta-player-global-css';
         globalStyle.textContent = `
@@ -13,6 +13,10 @@ if (window.location.hostname.includes('instagram.com')) {
         `;
         document.head.appendChild(globalStyle);
     }
+    
+    // Inject safely when DOM is ready
+    if (document.head) injectGlobalCss();
+    else document.addEventListener('DOMContentLoaded', injectGlobalCss);
 
     const playerHost = document.createElement('div');
     playerHost.id = 'insta-custom-player-host';
