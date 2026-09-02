@@ -17,7 +17,8 @@ const DEFAULT_PREFS = {
         'resetSpeed': 'r',
         'togglePiP': 'p',
         'toggleHUD': 'v'
-    }
+    },
+    customPresets: []
 };
 
 const ACTION_LABELS = {
@@ -76,7 +77,17 @@ const els = {
     prefPitch: document.getElementById('pref-pitch'),
     keybindGrid: document.getElementById('keybind-grid'),
     rebindError: document.getElementById('rebind-error'),
-    resetSettingsBtn: document.getElementById('reset-settings-btn')
+    resetSettingsBtn: document.getElementById('reset-settings-btn'),
+
+    addPresetBtn: document.getElementById('add-preset-btn'),
+    presetCreator: document.getElementById('preset-creator'),
+    newPresetType: document.getElementById('new-preset-type'),
+    newPresetVal: document.getElementById('new-preset-val'),
+    newPresetValLabel: document.getElementById('new-preset-val-label'),
+    newPresetKeyBtn: document.getElementById('new-preset-key-btn'),
+    savePresetBtn: document.getElementById('save-preset-btn'),
+    cancelPresetBtn: document.getElementById('cancel-preset-btn'),
+    presetList: document.getElementById('preset-list')
 };
 
 // Safe tab messaging with Promise resolution
@@ -154,6 +165,7 @@ function setUnsupported(title, desc) {
 }
 
 function formatHotkeyDisplay(str) {
+    if (!str) return 'None';
     if (str === ' ') return 'Space';
     return str.split('+').map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' + ');
 }
@@ -167,6 +179,62 @@ function renderSettings() {
     
     els.volSlider.max = prefs.maxVolume;
     
+    // 1. Render Custom Presets
+    els.presetList.innerHTML = '';
+    if (!prefs.customPresets || prefs.customPresets.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'micro-copy';
+        empty.style.textAlign = 'left';
+        empty.style.padding = '4px 0';
+        empty.textContent = 'No custom presets added. Click "+ Add New" to create one.';
+        els.presetList.appendChild(empty);
+    } else {
+        prefs.customPresets.forEach((preset) => {
+            const row = document.createElement('div');
+            row.className = 'keybind-item';
+            
+            const left = document.createElement('div');
+            left.className = 'preset-item-left';
+            
+            const badge = document.createElement('span');
+            badge.className = `preset-badge ${preset.type}`;
+            badge.textContent = preset.type === 'speed' ? 'Speed' : 'Boost';
+            
+            const label = document.createElement('span');
+            label.className = 'keybind-label';
+            label.textContent = preset.type === 'speed' ? `${Number(preset.value).toFixed(2)}x` : `${preset.value}%`;
+            
+            left.appendChild(badge);
+            left.appendChild(label);
+            
+            const right = document.createElement('div');
+            right.className = 'preset-item-right';
+            
+            const keyBtn = document.createElement('button');
+            keyBtn.className = 'keybind-btn';
+            keyBtn.textContent = formatHotkeyDisplay(preset.key);
+            keyBtn.addEventListener('click', () => startRebind({ type: 'preset', id: preset.id }, keyBtn));
+            
+            const delBtn = document.createElement('button');
+            delBtn.className = 'delete-btn';
+            delBtn.title = 'Delete Preset';
+            delBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
+            delBtn.addEventListener('click', () => {
+                prefs.customPresets = prefs.customPresets.filter(p => p.id !== preset.id);
+                savePrefs();
+                renderSettings();
+            });
+            
+            right.appendChild(keyBtn);
+            right.appendChild(delBtn);
+            
+            row.appendChild(left);
+            row.appendChild(right);
+            els.presetList.appendChild(row);
+        });
+    }
+
+    // 2. Render Standard Keybindings
     els.keybindGrid.innerHTML = '';
     for (const [action, keyStr] of Object.entries(prefs.keybinds)) {
         if (!ACTION_LABELS[action]) continue;
@@ -182,7 +250,7 @@ function renderSettings() {
         btn.className = 'keybind-btn';
         btn.textContent = formatHotkeyDisplay(keyStr);
         
-        btn.addEventListener('click', () => startRebind(action, btn));
+        btn.addEventListener('click', () => startRebind({ type: 'action', action }, btn));
         
         row.appendChild(label);
         row.appendChild(btn);
@@ -190,32 +258,62 @@ function renderSettings() {
     }
 }
 
-// Rebinding logic
-let bindingAction = null;
+// Rebinding state
+let bindingTarget = null;
 let bindingBtn = null;
+let newPresetKey = null;
 
-function startRebind(action, btn) {
+function startRebind(target, btn) {
     if (bindingBtn) {
-        bindingBtn.classList.remove('listening');
-        bindingBtn.textContent = formatHotkeyDisplay(prefs.keybinds[bindingAction]);
+        cancelRebind();
     }
-    bindingAction = action;
+    bindingTarget = target;
     bindingBtn = btn;
     btn.textContent = 'Listening...';
     btn.classList.add('listening');
     els.rebindError.classList.add('hidden');
 }
 
+function cancelRebind() {
+    if (!bindingBtn || !bindingTarget) return;
+    bindingBtn.classList.remove('listening');
+    if (bindingTarget.type === 'action') {
+        bindingBtn.textContent = formatHotkeyDisplay(prefs.keybinds[bindingTarget.action]);
+    } else if (bindingTarget.type === 'preset') {
+        const p = prefs.customPresets.find(item => item.id === bindingTarget.id);
+        bindingBtn.textContent = formatHotkeyDisplay(p ? p.key : '');
+    } else if (bindingTarget.type === 'newPreset') {
+        bindingBtn.textContent = formatHotkeyDisplay(newPresetKey || 'Click to Bind');
+    }
+    bindingTarget = null;
+    bindingBtn = null;
+}
+
+function getConflict(hotkeyStr, currentTarget) {
+    // Check standard actions
+    for (const [act, key] of Object.entries(prefs.keybinds)) {
+        if (key === hotkeyStr) {
+            if (currentTarget && currentTarget.type === 'action' && currentTarget.action === act) continue;
+            return ACTION_LABELS[act] || act;
+        }
+    }
+    // Check custom presets
+    for (const p of (prefs.customPresets || [])) {
+        if (p.key === hotkeyStr) {
+            if (currentTarget && currentTarget.type === 'preset' && currentTarget.id === p.id) continue;
+            return p.type === 'speed' ? `Speed ${Number(p.value).toFixed(2)}x preset` : `Audio Boost ${p.value}% preset`;
+        }
+    }
+    return null;
+}
+
 document.addEventListener('keydown', (e) => {
-    if (!bindingAction) return;
+    if (!bindingTarget) return;
     e.preventDefault();
     e.stopPropagation();
     
     if (e.key === 'Escape') {
-        bindingBtn.classList.remove('listening');
-        bindingBtn.textContent = formatHotkeyDisplay(prefs.keybinds[bindingAction]);
-        bindingAction = null;
-        bindingBtn = null;
+        cancelRebind();
         return;
     }
     
@@ -231,29 +329,106 @@ document.addEventListener('keydown', (e) => {
     const hotkeyStr = parts.join('+');
     
     // Conflict detection
-    let conflict = null;
-    for (const [act, key] of Object.entries(prefs.keybinds)) {
-        if (key === hotkeyStr && act !== bindingAction) {
-            conflict = ACTION_LABELS[act];
-            break;
-        }
-    }
+    const conflict = getConflict(hotkeyStr, bindingTarget);
     
     if (conflict) {
         els.rebindError.textContent = `"${formatHotkeyDisplay(hotkeyStr)}" is already assigned to ${conflict}.`;
         els.rebindError.classList.remove('hidden');
-        bindingBtn.classList.remove('listening');
-        bindingBtn.textContent = formatHotkeyDisplay(prefs.keybinds[bindingAction]);
+        cancelRebind();
     } else {
-        prefs.keybinds[bindingAction] = hotkeyStr;
+        els.rebindError.classList.add('hidden');
+        if (bindingTarget.type === 'action') {
+            prefs.keybinds[bindingTarget.action] = hotkeyStr;
+            bindingBtn.textContent = formatHotkeyDisplay(hotkeyStr);
+            savePrefs();
+        } else if (bindingTarget.type === 'preset') {
+            const p = (prefs.customPresets || []).find(item => item.id === bindingTarget.id);
+            if (p) p.key = hotkeyStr;
+            bindingBtn.textContent = formatHotkeyDisplay(hotkeyStr);
+            savePrefs();
+        } else if (bindingTarget.type === 'newPreset') {
+            newPresetKey = hotkeyStr;
+            bindingBtn.textContent = formatHotkeyDisplay(hotkeyStr);
+        }
         bindingBtn.classList.remove('listening');
-        bindingBtn.textContent = formatHotkeyDisplay(hotkeyStr);
-        savePrefs();
+        bindingTarget = null;
+        bindingBtn = null;
     }
-    
-    bindingAction = null;
-    bindingBtn = null;
 }, { capture: true });
+
+function resetPresetCreator() {
+    newPresetKey = null;
+    els.newPresetKeyBtn.textContent = 'Click to Bind';
+    els.newPresetKeyBtn.classList.remove('listening');
+    els.newPresetType.value = 'speed';
+    els.newPresetValLabel.textContent = 'Target Speed (x)';
+    els.newPresetVal.min = '0.25';
+    els.newPresetVal.max = '5.0';
+    els.newPresetVal.step = '0.25';
+    els.newPresetVal.value = '2.0';
+    els.rebindError.classList.add('hidden');
+}
+
+// Preset Creator Events
+els.addPresetBtn.addEventListener('click', () => {
+    els.presetCreator.classList.toggle('hidden');
+    if (!els.presetCreator.classList.contains('hidden')) {
+        resetPresetCreator();
+    }
+});
+
+els.cancelPresetBtn.addEventListener('click', () => {
+    els.presetCreator.classList.add('hidden');
+    resetPresetCreator();
+});
+
+els.newPresetType.addEventListener('change', (e) => {
+    const type = e.target.value;
+    if (type === 'speed') {
+        els.newPresetValLabel.textContent = 'Target Speed (x)';
+        els.newPresetVal.min = '0.25';
+        els.newPresetVal.max = '5.0';
+        els.newPresetVal.step = '0.25';
+        els.newPresetVal.value = '2.0';
+    } else {
+        els.newPresetValLabel.textContent = 'Target Boost (%)';
+        els.newPresetVal.min = '10';
+        els.newPresetVal.max = '800';
+        els.newPresetVal.step = '10';
+        els.newPresetVal.value = '200';
+    }
+});
+
+els.newPresetKeyBtn.addEventListener('click', () => {
+    startRebind({ type: 'newPreset' }, els.newPresetKeyBtn);
+});
+
+els.savePresetBtn.addEventListener('click', () => {
+    if (!newPresetKey) {
+        els.rebindError.textContent = 'Please click to assign a keybinding first.';
+        els.rebindError.classList.remove('hidden');
+        return;
+    }
+    const type = els.newPresetType.value;
+    let val = parseFloat(els.newPresetVal.value);
+    if (isNaN(val)) val = type === 'speed' ? 2.0 : 200;
+    if (type === 'speed') val = Math.max(0.25, Math.min(5.0, val));
+    if (type === 'volume') val = Math.max(10, Math.min(800, parseInt(val, 10)));
+    
+    const newPreset = {
+        id: 'preset-' + Date.now(),
+        type: type,
+        value: val,
+        key: newPresetKey
+    };
+    
+    if (!prefs.customPresets) prefs.customPresets = [];
+    prefs.customPresets.push(newPreset);
+    savePrefs();
+    renderSettings();
+    els.presetCreator.classList.add('hidden');
+    resetPresetCreator();
+});
 
 function savePrefs() {
     chrome.storage.local.set({ prefs });
@@ -356,7 +531,8 @@ async function init() {
             prefs = { 
                 ...DEFAULT_PREFS, 
                 ...res.prefs, 
-                keybinds: { ...DEFAULT_PREFS.keybinds, ...(res.prefs.keybinds || {}) } 
+                keybinds: { ...DEFAULT_PREFS.keybinds, ...(res.prefs.keybinds || {}) },
+                customPresets: res.prefs.customPresets || []
             };
         }
     } catch (e) {}

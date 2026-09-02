@@ -16,12 +16,14 @@ const DEFAULT_KEYBINDS = {
 };
 
 let activeKeybinds = { ...DEFAULT_KEYBINDS };
+let activeCustomPresets = [];
 
 // Load initially from storage
 if (chrome && chrome.storage) {
     chrome.storage.local.get(['prefs'], (res) => {
-        if (res.prefs && res.prefs.keybinds) {
-            activeKeybinds = { ...DEFAULT_KEYBINDS, ...res.prefs.keybinds };
+        if (res.prefs) {
+            if (res.prefs.keybinds) activeKeybinds = { ...DEFAULT_KEYBINDS, ...res.prefs.keybinds };
+            if (res.prefs.customPresets) activeCustomPresets = res.prefs.customPresets;
         }
     });
 
@@ -29,6 +31,9 @@ if (chrome && chrome.storage) {
         if (area === 'local' && changes.prefs && changes.prefs.newValue) {
             if (changes.prefs.newValue.keybinds) {
                 activeKeybinds = { ...DEFAULT_KEYBINDS, ...changes.prefs.newValue.keybinds };
+            }
+            if (changes.prefs.newValue.customPresets) {
+                activeCustomPresets = changes.prefs.newValue.customPresets;
             }
         }
     });
@@ -64,8 +69,21 @@ document.addEventListener('keydown', (e) => {
     
     const hotkeyStr = getHotkeyString(e);
     if (!hotkeyStr) return;
-    
-    // Reverse lookup: Find which action matches this hotkey string
+    if (!window.InstaController) return;
+
+    // 1. Check custom presets first
+    const matchedPreset = activeCustomPresets.find(p => p.key === hotkeyStr);
+    if (matchedPreset) {
+        e.preventDefault();
+        if (matchedPreset.type === 'speed') {
+            window.InstaController.setPlaybackRate(parseFloat(matchedPreset.value));
+        } else if (matchedPreset.type === 'volume') {
+            window.InstaController.setVolume(parseFloat(matchedPreset.value) / 100);
+        }
+        return;
+    }
+
+    // 2. Reverse lookup: Find which standard action matches this hotkey string
     let action = null;
     for (const [act, key] of Object.entries(activeKeybinds)) {
         if (key === hotkeyStr) {
@@ -75,7 +93,6 @@ document.addEventListener('keydown', (e) => {
     }
     
     if (!action) return;
-    if (!window.InstaController) return;
 
     switch (action) {
         case 'togglePlay':
