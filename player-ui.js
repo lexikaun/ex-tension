@@ -17,31 +17,29 @@ if (window.location.hostname.includes('instagram.com')) {
         :host {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             --primary: #ffffff;
-            --bg: rgba(15, 15, 15, 0.65);
-            --bg-hover: rgba(25, 25, 25, 0.8);
+            --bg: rgba(0, 0, 0, 0.5);
+            --bg-hover: rgba(20, 20, 20, 0.85);
             --accent: #E0E0E0;
         }
 
         .player-container {
             position: absolute;
-            bottom: 40px; /* Float above native captions */
-            left: 5%;
-            width: 90%;
+            bottom: 0;
+            left: 0;
+            width: 100%;
             background: var(--bg);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            padding: 12px 16px;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 4px 12px;
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 4px;
             opacity: 0;
-            transform: translateY(10px);
-            transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: translateY(4px);
+            transition: opacity 0.2s ease, transform 0.2s ease;
             pointer-events: auto;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
         }
 
         .player-container.visible, .player-container:hover {
@@ -53,26 +51,27 @@ if (window.location.hostname.includes('instagram.com')) {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            height: 28px;
         }
 
         .controls-left, .controls-right {
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 12px;
         }
 
         button {
             background: none;
             border: none;
-            padding: 4px;
+            padding: 2px;
             margin: 0;
             cursor: pointer;
             color: var(--primary);
             display: flex;
             align-items: center;
             justify-content: center;
-            opacity: 0.7;
-            transition: opacity 0.2s, transform 0.1s;
+            opacity: 0.8;
+            transition: opacity 0.15s, transform 0.15s;
         }
         
         button:hover {
@@ -81,68 +80,69 @@ if (window.location.hostname.includes('instagram.com')) {
         }
 
         svg {
-            width: 22px;
-            height: 22px;
+            width: 18px;
+            height: 18px;
             fill: currentColor;
-            filter: drop-shadow(0px 1px 2px rgba(0,0,0,0.3));
+            filter: drop-shadow(0px 1px 2px rgba(0,0,0,0.4));
         }
 
         .time-display {
             color: var(--primary);
-            font-size: 13px;
+            font-size: 11px;
             font-variant-numeric: tabular-nums;
             font-weight: 500;
             opacity: 0.9;
-            letter-spacing: 0.3px;
+            letter-spacing: 0.2px;
+            text-shadow: 0px 1px 2px rgba(0,0,0,0.5);
+            margin-left: 4px;
         }
 
         /* Scrubber */
         .scrubber-wrapper {
             position: relative;
             width: 100%;
-            height: 16px;
+            height: 12px;
             display: flex;
             align-items: center;
             cursor: pointer;
-            border-radius: 8px;
         }
 
         .scrubber-track {
             position: absolute;
             left: 0;
             width: 100%;
-            height: 4px;
-            background: rgba(255, 255, 255, 0.25);
+            height: 3px;
+            background: rgba(255, 255, 255, 0.2);
             border-radius: 2px;
-            transition: height 0.2s;
+            transition: height 0.1s;
         }
 
         .scrubber-progress {
             position: absolute;
             left: 0;
-            height: 4px;
+            height: 3px;
             background: var(--primary);
             border-radius: 2px;
             width: 0%;
-            transition: height 0.2s;
+            transition: height 0.1s;
         }
 
         .scrubber-thumb {
             position: absolute;
-            width: 12px;
-            height: 12px;
+            width: 10px;
+            height: 10px;
             background: var(--primary);
             border-radius: 50%;
             left: 0%;
             transform: translateX(-50%) scale(0);
-            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             pointer-events: none;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.5);
         }
 
         .scrubber-wrapper:hover .scrubber-track,
         .scrubber-wrapper:hover .scrubber-progress {
-            height: 6px;
+            height: 4px;
         }
 
         .scrubber-wrapper:hover .scrubber-thumb {
@@ -160,47 +160,47 @@ if (window.location.hostname.includes('instagram.com')) {
             position: absolute;
             bottom: 100%;
             left: 50%;
-            transform: translateX(-50%) translateY(10px);
+            transform: translateX(-50%) translateY(8px);
             background: var(--bg-hover);
-            backdrop-filter: blur(12px);
+            backdrop-filter: blur(8px);
             border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            padding: 12px 0;
+            border-radius: 8px;
+            padding: 8px 0;
             opacity: 0;
             visibility: hidden;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.2s ease;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100px;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+            height: 80px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
         }
 
         .volume-container:hover .volume-popup {
             opacity: 1;
             visibility: visible;
-            transform: translateX(-50%) translateY(-12px);
+            transform: translateX(-50%) translateY(-6px);
         }
 
         .volume-slider {
             -webkit-appearance: slider-vertical;
             appearance: slider-vertical;
-            width: 6px;
-            height: 80px;
+            width: 4px;
+            height: 64px;
             cursor: pointer;
             background: rgba(255,255,255,0.2);
-            border-radius: 3px;
+            border-radius: 2px;
             outline: none;
         }
         
         .volume-slider::-webkit-slider-thumb {
             -webkit-appearance: none;
-            width: 14px;
-            height: 14px;
+            width: 10px;
+            height: 10px;
             background: #fff;
             border-radius: 50%;
             cursor: pointer;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.5);
         }
     `;
 
