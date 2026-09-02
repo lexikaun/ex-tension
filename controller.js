@@ -79,6 +79,9 @@ function applyDesiredSettings() {
             if (audioGraphs.has(video)) {
                 const graph = audioGraphs.get(video);
                 if (graph && graph.gainNode) graph.gainNode.gain.value = 1.0;
+                if (graph && graph.ctx && graph.ctx.state === 'suspended' && !desiredMuted) {
+                    graph.ctx.resume().catch(() => {});
+                }
             }
         } else {
             // Standard volume maxed out for Web Audio
@@ -86,7 +89,7 @@ function applyDesiredSettings() {
             const graph = getAudioGraph(video);
             if (graph && graph.gainNode) {
                 graph.gainNode.gain.value = desiredVolume;
-                if (graph.ctx.state === 'suspended') {
+                if (graph.ctx.state === 'suspended' && !desiredMuted) {
                     graph.ctx.resume().catch(() => {});
                 }
             }
@@ -104,12 +107,13 @@ function onRateChange(e) {
 function onVolumeChange(e) {
     const video = e.target;
     if (!video) return;
-    if (desiredVolume <= 1.0) {
-        if (video.volume !== desiredVolume) video.volume = desiredVolume;
-    } else {
-        if (video.volume !== 1.0) video.volume = 1.0;
+    const active = getActiveVideo();
+    if (video === active) {
+        desiredMuted = video.muted;
+        if (video.volume > 0 && desiredVolume <= 1.0) {
+            desiredVolume = video.volume;
+        }
     }
-    if (video.muted !== desiredMuted) video.muted = desiredMuted;
 }
 
 function onLoadedMetadata(e) {
@@ -223,7 +227,17 @@ window.InstaController = {
     },
     getVolume: () => desiredVolume,
     toggleMute: () => {
-        desiredMuted = !desiredMuted;
+        const v = getActiveVideo();
+        const isCurrentlyMuted = v && typeof v.muted === 'boolean' ? v.muted : desiredMuted;
+        desiredMuted = !isCurrentlyMuted;
+        if (!desiredMuted) {
+            if (desiredVolume === 0) {
+                desiredVolume = 1.0;
+            }
+            if (v && v.volume === 0) {
+                v.volume = 1.0;
+            }
+        }
         applyDesiredSettings();
         document.dispatchEvent(new CustomEvent('insta-player:state-updated'));
     },

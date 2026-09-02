@@ -34,8 +34,6 @@ if (window.location.hostname.includes('instagram.com')) {
         :host {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             --primary: #ffffff;
-            --bg: rgba(0, 0, 0, 0.5);
-            --bg-hover: rgba(20, 20, 20, 0.85);
             --accent: #E0E0E0;
         }
 
@@ -44,24 +42,19 @@ if (window.location.hostname.includes('instagram.com')) {
             bottom: 0;
             left: 0;
             width: 100%;
-            background: var(--bg);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            background: transparent;
             padding: 4px 12px;
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
             gap: 4px;
             opacity: 0;
-            transform: translateY(4px);
-            transition: opacity 0.2s ease, transform 0.2s ease;
+            transition: opacity 0.2s ease;
             pointer-events: auto;
         }
 
         .player-container.visible, .player-container:hover {
             opacity: 1;
-            transform: translateY(0);
         }
 
         .controls-row {
@@ -80,14 +73,14 @@ if (window.location.hostname.includes('instagram.com')) {
         button {
             background: none;
             border: none;
-            padding: 2px;
+            padding: 4px;
             margin: 0;
             cursor: pointer;
             color: var(--primary);
             display: flex;
             align-items: center;
             justify-content: center;
-            opacity: 0.8;
+            opacity: 0.85;
             transition: opacity 0.15s, transform 0.15s;
         }
         
@@ -96,21 +89,25 @@ if (window.location.hostname.includes('instagram.com')) {
             transform: scale(1.1);
         }
 
+        button svg {
+            pointer-events: none;
+        }
+
         svg {
             width: 18px;
             height: 18px;
             fill: currentColor;
-            filter: drop-shadow(0px 1px 2px rgba(0,0,0,0.4));
+            filter: drop-shadow(0px 1px 2px rgba(0,0,0,0.8));
         }
 
         .time-display {
             color: var(--primary);
             font-size: 11px;
             font-variant-numeric: tabular-nums;
-            font-weight: 500;
-            opacity: 0.9;
+            font-weight: 600;
+            opacity: 0.95;
             letter-spacing: 0.2px;
-            text-shadow: 0px 1px 2px rgba(0,0,0,0.5);
+            text-shadow: 0px 1px 2px rgba(0,0,0,0.9);
             margin-left: 4px;
         }
 
@@ -129,8 +126,9 @@ if (window.location.hostname.includes('instagram.com')) {
             left: 0;
             width: 100%;
             height: 3px;
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.35);
             border-radius: 2px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.6);
             transition: height 0.1s;
         }
 
@@ -141,6 +139,7 @@ if (window.location.hostname.includes('instagram.com')) {
             background: var(--primary);
             border-radius: 2px;
             width: 0%;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.6);
             transition: height 0.1s;
         }
 
@@ -154,7 +153,7 @@ if (window.location.hostname.includes('instagram.com')) {
             transform: translateX(-50%) scale(0);
             transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             pointer-events: none;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.7);
         }
 
         .scrubber-wrapper:hover .scrubber-track,
@@ -177,37 +176,37 @@ if (window.location.hostname.includes('instagram.com')) {
             position: absolute;
             bottom: 100%;
             left: 50%;
-            transform: translateX(-50%) translateY(8px);
-            background: var(--bg);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: 8px;
+            transform: translateX(-50%) translateY(4px);
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 6px;
             padding: 0;
             opacity: 0;
             visibility: hidden;
-            transition: all 0.2s ease;
+            transition: opacity 0.15s ease, visibility 0.15s ease, transform 0.15s ease;
             display: flex;
             justify-content: center;
             align-items: center;
-            width: 24px;
-            height: 90px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            width: 22px;
+            height: 75px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+            pointer-events: none;
         }
 
-        .volume-container:hover .volume-popup {
+        .volume-container:hover .volume-popup,
+        .volume-popup:hover {
             opacity: 1;
             visibility: visible;
             transform: translateX(-50%) translateY(-4px);
+            pointer-events: auto;
         }
 
         .volume-slider {
             -webkit-appearance: none;
             appearance: none;
-            width: 70px;
-            height: 4px;
+            width: 60px;
+            height: 3px;
             cursor: pointer;
-            background: rgba(255,255,255,0.3);
+            background: rgba(255,255,255,0.4);
             border-radius: 2px;
             outline: none;
             transform: rotate(-90deg);
@@ -215,12 +214,12 @@ if (window.location.hostname.includes('instagram.com')) {
         
         .volume-slider::-webkit-slider-thumb {
             -webkit-appearance: none;
-            width: 12px;
-            height: 12px;
+            width: 10px;
+            height: 10px;
             background: #fff;
             border-radius: 50%;
             cursor: pointer;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.6);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.8);
         }
     `;
 
@@ -298,10 +297,11 @@ if (window.location.hostname.includes('instagram.com')) {
         btnPlayPause.innerHTML = makeSvg(currentVideo.paused ? icons.play : icons.pause);
         
         // Mute & Volume
-        const isMuted = currentVideo.muted || currentVideo.volume === 0;
+        const isMuted = currentVideo.muted || (window.InstaController ? window.InstaController.isMuted() : false) || currentVideo.volume === 0;
         btnMute.innerHTML = makeSvg(isMuted ? icons.mute : icons.unmute);
         if (!isDraggingVolume) {
-            volumeSlider.value = isMuted ? 0 : currentVideo.volume;
+            const vol = window.InstaController ? window.InstaController.getVolume() : (currentVideo.volume !== undefined ? currentVideo.volume : 1);
+            volumeSlider.value = isMuted ? 0 : Math.min(1.0, vol);
         }
         
         // Time & Scrubber (only if not dragging)
@@ -337,20 +337,29 @@ if (window.location.hostname.includes('instagram.com')) {
 
     btnMute.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (!currentVideo) return;
-        currentVideo.muted = !currentVideo.muted;
-        if (!currentVideo.muted && currentVideo.volume === 0) {
-            currentVideo.volume = 1;
+        e.preventDefault();
+        if (window.InstaController && typeof window.InstaController.toggleMute === 'function') {
+            window.InstaController.toggleMute();
+        } else if (currentVideo) {
+            currentVideo.muted = !currentVideo.muted;
+            if (!currentVideo.muted && currentVideo.volume === 0) {
+                currentVideo.volume = 1.0;
+            }
         }
+        updateUI();
     });
 
     volumeSlider.addEventListener('mousedown', () => isDraggingVolume = true);
     volumeSlider.addEventListener('mouseup', () => isDraggingVolume = false);
     volumeSlider.addEventListener('input', (e) => {
-        if (!currentVideo) return;
         const val = parseFloat(e.target.value);
-        currentVideo.volume = val;
-        currentVideo.muted = val === 0;
+        if (window.InstaController && typeof window.InstaController.setVolume === 'function') {
+            window.InstaController.setVolume(val);
+        } else if (currentVideo) {
+            currentVideo.volume = val;
+            currentVideo.muted = val === 0;
+        }
+        updateUI();
     });
 
     btnPip.addEventListener('click', (e) => {
@@ -507,6 +516,10 @@ if (window.location.hostname.includes('instagram.com')) {
 
     document.addEventListener('insta-player:active-video-changed', (e) => {
         attachToVideo(e.detail.video);
+    });
+
+    document.addEventListener('insta-player:state-updated', () => {
+        updateUI();
     });
 
     // Initial check
