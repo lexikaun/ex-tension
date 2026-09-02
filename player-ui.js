@@ -1,0 +1,362 @@
+// Only run on Instagram as per user requirement
+if (window.location.hostname.includes('instagram.com')) {
+
+    const playerHost = document.createElement('div');
+    playerHost.id = 'insta-custom-player-host';
+    playerHost.style.position = 'absolute';
+    playerHost.style.bottom = '0';
+    playerHost.style.left = '0';
+    playerHost.style.width = '100%';
+    playerHost.style.zIndex = '999999';
+    playerHost.style.pointerEvents = 'none'; // Let clicks pass through if we're not hovering the bar itself
+
+    const shadow = playerHost.attachShadow({ mode: 'closed' });
+
+    const style = document.createElement('style');
+    style.textContent = `
+        :host {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --primary: #ffffff;
+            --bg: linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%);
+            --accent: #E0E0E0;
+        }
+
+        .player-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: var(--bg);
+            padding: 10px 15px 5px 15px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            pointer-events: auto;
+        }
+
+        .player-container.visible, .player-container:hover {
+            opacity: 1;
+        }
+
+        .controls-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .controls-left, .controls-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        button {
+            background: none;
+            border: none;
+            padding: 0;
+            margin: 0;
+            cursor: pointer;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0.85;
+            transition: opacity 0.1s;
+        }
+        
+        button:hover {
+            opacity: 1;
+        }
+
+        svg {
+            width: 24px;
+            height: 24px;
+            fill: currentColor;
+            filter: drop-shadow(0px 1px 2px rgba(0,0,0,0.5));
+        }
+
+        .time-display {
+            color: var(--primary);
+            font-size: 13px;
+            font-variant-numeric: tabular-nums;
+            text-shadow: 0px 1px 2px rgba(0,0,0,0.5);
+            font-weight: 500;
+        }
+
+        /* Scrubber */
+        .scrubber-wrapper {
+            position: relative;
+            width: 100%;
+            height: 12px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .scrubber-track {
+            position: absolute;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 2px;
+            transition: height 0.1s;
+        }
+
+        .scrubber-progress {
+            position: absolute;
+            left: 0;
+            height: 3px;
+            background: var(--primary);
+            border-radius: 2px;
+            width: 0%;
+            transition: height 0.1s;
+        }
+
+        .scrubber-thumb {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: var(--primary);
+            border-radius: 50%;
+            left: 0%;
+            transform: translateX(-50%) scale(0);
+            transition: transform 0.1s;
+            pointer-events: none;
+        }
+
+        .scrubber-wrapper:hover .scrubber-track,
+        .scrubber-wrapper:hover .scrubber-progress {
+            height: 5px;
+        }
+
+        .scrubber-wrapper:hover .scrubber-thumb {
+            transform: translateX(-50%) scale(1);
+        }
+    `;
+
+    const container = document.createElement('div');
+    container.className = 'player-container';
+    
+    // SVGs
+    const icons = {
+        play: '<path d="M8 5v14l11-7z"/>',
+        pause: '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>',
+        mute: '<path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>',
+        unmute: '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>',
+        pip: '<path d="M19 11h-8v6h8v-6zm4 8V4.98C23 3.88 22.1 3 21 3H3c-1.1 0-2 .88-2 1.98V19c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2zm-2 .02H3V4.97h18v14.05z"/>',
+        fullscreen: '<path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>',
+        exitFullscreen: '<path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>'
+    };
+
+    const makeSvg = (path) => `<svg viewBox="0 0 24 24">${path}</svg>`;
+
+    container.innerHTML = `
+        <div class="scrubber-wrapper">
+            <div class="scrubber-track"></div>
+            <div class="scrubber-progress"></div>
+            <div class="scrubber-thumb"></div>
+        </div>
+        <div class="controls-row">
+            <div class="controls-left">
+                <button class="btn-play-pause">${makeSvg(icons.play)}</button>
+                <button class="btn-mute">${makeSvg(icons.unmute)}</button>
+                <div class="time-display">0:00 / 0:00</div>
+            </div>
+            <div class="controls-right">
+                <button class="btn-pip">${makeSvg(icons.pip)}</button>
+                <button class="btn-fullscreen">${makeSvg(icons.fullscreen)}</button>
+            </div>
+        </div>
+    `;
+
+    shadow.appendChild(style);
+    shadow.appendChild(container);
+
+    // Elements
+    const btnPlayPause = container.querySelector('.btn-play-pause');
+    const btnMute = container.querySelector('.btn-mute');
+    const btnPip = container.querySelector('.btn-pip');
+    const btnFullscreen = container.querySelector('.btn-fullscreen');
+    const timeDisplay = container.querySelector('.time-display');
+    const scrubberWrapper = container.querySelector('.scrubber-wrapper');
+    const scrubberProgress = container.querySelector('.scrubber-progress');
+    const scrubberThumb = container.querySelector('.scrubber-thumb');
+
+    let currentVideo = null;
+    let isDragging = false;
+    let visibilityTimeout = null;
+
+    // Helpers
+    function formatTime(seconds) {
+        if (!seconds || isNaN(seconds)) return "0:00";
+        const m = Math.floor(seconds / 60);
+        const s = Math.floor(seconds % 60);
+        return `${m}:${s.toString().padStart(2, '0')}`;
+    }
+
+    function updateUI() {
+        if (!currentVideo) return;
+        
+        // Play/Pause
+        btnPlayPause.innerHTML = makeSvg(currentVideo.paused ? icons.play : icons.pause);
+        
+        // Mute
+        btnMute.innerHTML = makeSvg(currentVideo.muted || currentVideo.volume === 0 ? icons.mute : icons.unmute);
+        
+        // Time & Scrubber (only if not dragging)
+        if (!isDragging) {
+            const cur = currentVideo.currentTime;
+            const dur = currentVideo.duration;
+            timeDisplay.textContent = `${formatTime(cur)} / ${formatTime(dur)}`;
+            
+            if (dur > 0) {
+                const percent = (cur / dur) * 100;
+                scrubberProgress.style.width = `${percent}%`;
+                scrubberThumb.style.left = `${percent}%`;
+            }
+        }
+    }
+
+    function showControls() {
+        container.classList.add('visible');
+        clearTimeout(visibilityTimeout);
+        visibilityTimeout = setTimeout(() => {
+            if (!currentVideo?.paused && !isDragging) {
+                container.classList.remove('visible');
+            }
+        }, 2500);
+    }
+
+    // Interactions
+    btnPlayPause.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!currentVideo) return;
+        currentVideo.paused ? currentVideo.play() : currentVideo.pause();
+    });
+
+    btnMute.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!currentVideo) return;
+        currentVideo.muted = !currentVideo.muted;
+    });
+
+    btnPip.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (window.InstaPiP) window.InstaPiP.toggle();
+    });
+
+    btnFullscreen.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!currentVideo) return;
+        const parent = currentVideo.closest('article') || currentVideo.parentNode;
+        if (document.fullscreenElement) {
+            document.exitFullscreen();
+            btnFullscreen.innerHTML = makeSvg(icons.fullscreen);
+        } else {
+            parent.requestFullscreen();
+            btnFullscreen.innerHTML = makeSvg(icons.exitFullscreen);
+        }
+    });
+
+    // Scrubber Logic
+    function handleScrub(e) {
+        if (!currentVideo || !currentVideo.duration) return;
+        const rect = scrubberWrapper.getBoundingClientRect();
+        const pos = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+        const percent = pos / rect.width;
+        
+        scrubberProgress.style.width = `${percent * 100}%`;
+        scrubberThumb.style.left = `${percent * 100}%`;
+        
+        if (!isDragging) {
+            currentVideo.currentTime = percent * currentVideo.duration;
+        } else {
+            timeDisplay.textContent = `${formatTime(percent * currentVideo.duration)} / ${formatTime(currentVideo.duration)}`;
+        }
+    }
+
+    scrubberWrapper.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        handleScrub(e);
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+    });
+
+    function onMouseMove(e) {
+        if (isDragging) handleScrub(e);
+    }
+
+    function onMouseUp(e) {
+        if (isDragging) {
+            isDragging = false;
+            const rect = scrubberWrapper.getBoundingClientRect();
+            const pos = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+            if (currentVideo && currentVideo.duration) {
+                currentVideo.currentTime = (pos / rect.width) * currentVideo.duration;
+            }
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+        }
+    }
+
+    // Attach to active video
+    function attachToVideo(video) {
+        if (currentVideo) {
+            currentVideo.removeEventListener('timeupdate', updateUI);
+            currentVideo.removeEventListener('play', updateUI);
+            currentVideo.removeEventListener('pause', updateUI);
+            currentVideo.removeEventListener('volumechange', updateUI);
+            currentVideo.removeEventListener('loadedmetadata', updateUI);
+        }
+
+        currentVideo = video;
+        if (!video) {
+            if (playerHost.parentNode) playerHost.parentNode.removeChild(playerHost);
+            return;
+        }
+
+        // Try to find a good container. Usually Instagram videos are in a wrapper div.
+        let targetContainer = video.parentNode;
+        
+        // Ensure container has relative/absolute positioning so playerHost absolute anchors properly
+        const style = window.getComputedStyle(targetContainer);
+        if (style.position === 'static') {
+            targetContainer.style.position = 'relative';
+        }
+
+        if (playerHost.parentNode !== targetContainer) {
+            targetContainer.appendChild(playerHost);
+        }
+
+        video.addEventListener('timeupdate', updateUI);
+        video.addEventListener('play', () => { updateUI(); showControls(); });
+        video.addEventListener('pause', () => { updateUI(); showControls(); });
+        video.addEventListener('volumechange', updateUI);
+        video.addEventListener('loadedmetadata', updateUI);
+        
+        // Show controls on mouse move over the video container
+        targetContainer.addEventListener('mousemove', showControls);
+        targetContainer.addEventListener('mouseleave', () => {
+            if (!currentVideo?.paused && !isDragging) {
+                container.classList.remove('visible');
+            }
+        });
+
+        updateUI();
+        showControls();
+    }
+
+    document.addEventListener('insta-player:active-video-changed', (e) => {
+        attachToVideo(e.detail.video);
+    });
+
+    // Initial check
+    if (window.InstaVideoFinder) {
+        attachToVideo(window.InstaVideoFinder.getActiveVideo());
+    }
+
+}
